@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+
+{% block title %}Home - Presentation Design System{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <!-- Hero Section -->
+    <div class="text-center mb-12">
+        <h1 class="text-4xl font-bold text-gray-900 mb-4">
+            Автоматизированный дизайн презентаций
+        </h1>
+        <p class="text-xl text-gray-600">
+            Вставьте ссылку на Google Slides и получите профессионально оформленную презентацию
+        </p>
+    </div>
+
+    <!-- Processing Form -->
+    <div class="bg-white rounded-lg shadow-lg p-8 mb-8">
+        <form action="/process" method="POST" class="space-y-6">
+            <!-- URL Input -->
+            <div>
+                <label for="presentation_url" class="block mb-2 text-sm font-medium text-gray-900">
+                    Google Slides URL
+                </label>
+                <input type="url" 
+                       id="presentation_url" 
+                       name="presentation_url"
+                       class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
+                       placeholder="https://docs.google.com/presentation/d/..."
+                       required>
+                <p class="mt-2 text-sm text-gray-500">
+                    Вставьте ссылку на вашу презентацию Google Slides
+                </p>
+            </div>
+
+            <!-- Template Selection -->
+            <div>
+                <label for="template_name" class="block mb-2 text-sm font-medium text-gray-900">
+                    Шаблон дизайна
+                </label>
+                <select id="template_name" 
+                        name="template_name"
+                        class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5">
+                    {% for template in templates %}
+                    <option value="{{ template }}">{{ template }}</option>
+                    {% endfor %}
+                </select>
+                <p class="mt-2 text-sm text-gray-500">
+                    Выберите шаблон оформления для презентации
+                </p>
+            </div>
+
+            <!-- Submit Button -->
+            <button type="submit"
+                    class="w-full text-white bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 focus:ring-4 focus:outline-none focus:ring-purple-300 font-medium rounded-lg text-sm px-5 py-3">
+                🎨 Применить дизайн
+            </button>
+        </form>
+    </div>
+
+    <!-- Features -->
+    <div class="grid md:grid-cols-3 gap-6">
+        <div class="bg-white p-6 rounded-lg shadow">
+            <div class="text-3xl mb-3">⚡</div>
+            <h3 class="font-bold text-lg mb-2">Быстро</h3>
+            <p class="text-gray-600 text-sm">Обработка за 1-2 минуты</p>
+        </div>
+        <div class="bg-white p-6 rounded-lg shadow">
+            <div class="text-3xl mb-3">🎨</div>
+            <h3 class="font-bold text-lg mb-2">Профессионально</h3>
+            <p class="text-gray-600 text-sm">Готовые дизайн-шаблоны</p>
+        </div>
+        <div class="bg-white p-6 rounded-lg shadow">
+            <div class="text-3xl mb-3">🔒</div>
+            <h3 class="font-bold text-lg mb-2">Безопасно</h3>
+            <p class="text-gray-600 text-sm">OAuth 2.0 аутентификация</p>
+        </div>
+    </div>
+
+    <!-- Recent Jobs -->
+    {% if jobs %}
+    <div class="mt-12">
+        <h2 class="text-2xl font-bold text-gray-900 mb-4">Последние обработки</h2>
+        <div class="bg-white rounded-lg shadow overflow-hidden">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Статус</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Шаблон</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Время</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Действия</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for job_id, job in jobs.items() | list | reverse %}{% if loop.index <= 5 %}
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            {% if job.status == 'completed' %}
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                Готово
+                            </span>
+                            {% elif job.status == 'error' %}
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                                Ошибка
+                            </span>
+                            {% else %}
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                                Обработка...
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ job.template }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ job.created_at[:19] }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <a href="/job/{{ job.id }}" class="text-blue-600 hover:text-blue-900">Подробнее</a>
+                        </td>
+                    </tr>
+                    {% endif %}{% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

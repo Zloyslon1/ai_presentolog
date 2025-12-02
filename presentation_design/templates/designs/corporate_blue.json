@@ -1,0 +1,67 @@
+{
+  "metadata": {
+    "name": "Corporate Blue",
+    "version": "1.0",
+    "author": "AI Presentolog",
+    "description": "Professional corporate template with blue color scheme"
+  },
+  "typography": {
+    "title": {
+      "font_family": "Arial",
+      "font_size": 44,
+      "font_weight": "bold",
+      "line_height": 1.2
+    },
+    "subtitle": {
+      "font_family": "Arial",
+      "font_size": 24,
+      "font_weight": "normal",
+      "line_height": 1.3
+    },
+    "heading": {
+      "font_family": "Arial",
+      "font_size": 32,
+      "font_weight": "bold",
+      "line_height": 1.3
+    },
+    "body": {
+      "font_family": "Arial",
+      "font_size": 18,
+      "font_weight": "normal",
+      "line_height": 1.5
+    },
+    "footer": {
+      "font_family": "Arial",
+      "font_size": 12,
+      "font_weight": "normal",
+      "line_height": 1.2
+    }
+  },
+  "colors": {
+    "primary": "#FFFFFF",
+    "secondary": "#E3F2FD",
+    "accent": "#90CAF9",
+    "background": "#1A237E",
+    "text": "#FFFFFF",
+    "text_light": "#BBDEFB"
+  },
+  "layouts": {
+    "title_slide": {
+      "title_position": {"x": 50, "y": 180, "width": 620, "height": 120},
+      "subtitle_position": {"x": 50, "y": 320, "width": 620, "height": 80}
+    },
+    "content_slide": {
+      "title_position": {"x": 40, "y": 30, "width": 640, "height": 60},
+      "heading_position": {"x": 40, "y": 110, "width": 640, "height": 50},
+      "body_position": {"x": 40, "y": 170, "width": 640, "height": 280},
+      "footer_position": {"x": 40, "y": 460, "width": 640, "height": 30}
+    }
+  },
+  "spacing": {
+    "margin_top": 50,
+    "margin_bottom": 50,
+    "margin_left": 50,
+    "margin_right": 50,
+    "paragraph_spacing": 10
+  }
+}

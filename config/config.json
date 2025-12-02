@@ -1,0 +1,27 @@
+{
+  "authentication": {
+    "client_secrets_path": "credentials/client_secret.json",
+    "token_path": "credentials/token.json",
+    "scopes": [
+      "https://www.googleapis.com/auth/presentations",
+      "https://www.googleapis.com/auth/drive.file"
+    ]
+  },
+  "templates": {
+    "template_directory": "presentation_design/templates",
+    "default_template": "default",
+    "fallback_behavior": "use_default"
+  },
+  "processing": {
+    "retry_count": 3,
+    "timeout_seconds": 60,
+    "batch_size": 10
+  },
+  "logging": {
+    "log_level": "INFO",
+    "log_file_path": "logs",
+    "log_format": "json",
+    "console_output": true,
+    "retention_days": 30
+  }
+}

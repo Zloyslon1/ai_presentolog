@@ -1,0 +1,42 @@
+{
+  "metadata": {
+    "name": "Default",
+    "version": "1.0",
+    "author": "AI Presentolog",
+    "description": "Default fallback template"
+  },
+  "typography": {
+    "title": {"font_family": "Arial", "font_size": 40, "font_weight": "bold", "line_height": 1.2},
+    "subtitle": {"font_family": "Arial", "font_size": 20, "font_weight": "normal", "line_height": 1.3},
+    "heading": {"font_family": "Arial", "font_size": 28, "font_weight": "bold", "line_height": 1.3},
+    "body": {"font_family": "Arial", "font_size": 16, "font_weight": "normal", "line_height": 1.5},
+    "footer": {"font_family": "Arial", "font_size": 10, "font_weight": "normal", "line_height": 1.2}
+  },
+  "colors": {
+    "primary": "#2196F3",
+    "secondary": "#1976D2",
+    "accent": "#FFC107",
+    "background": "#F5F5F5",
+    "text": "#212121",
+    "text_light": "#757575"
+  },
+  "layouts": {
+    "title_slide": {
+      "title_position": {"x": 50, "y": 180, "width": 620, "height": 120},
+      "subtitle_position": {"x": 50, "y": 320, "width": 620, "height": 80}
+    },
+    "content_slide": {
+      "title_position": {"x": 40, "y": 30, "width": 640, "height": 60},
+      "heading_position": {"x": 40, "y": 110, "width": 640, "height": 50},
+      "body_position": {"x": 40, "y": 170, "width": 640, "height": 280},
+      "footer_position": {"x": 40, "y": 460, "width": 640, "height": 30}
+    }
+  },
+  "spacing": {
+    "margin_top": 40,
+    "margin_bottom": 40,
+    "margin_left": 40,
+    "margin_right": 40,
+    "paragraph_spacing": 8
+  }
+}
