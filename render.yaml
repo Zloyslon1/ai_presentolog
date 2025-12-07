@@ -2,12 +2,15 @@ services:
   - type: web
     name: ai-presentolog
     env: python
+    runtime: python
     region: frankfurt
     plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn web_app:app --bind 0.0.0.0:$PORT
+    startCommand: gunicorn web_app:app --bind 0.0.0.0:$PORT --workers 2
     envVars:
       - key: PYTHON_VERSION
         value: 3.12
       - key: PORT
         value: 10000
+      - key: FLASK_ENV
+        value: production
