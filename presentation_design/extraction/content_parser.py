@@ -130,6 +130,74 @@ class ContentParser:
         return '\n'.join(text_parts)
     
     @staticmethod
+    def extract_raw_slide_elements(slide_data: Dict[str, Any], index: int) -> Dict[str, Any]:
+        """
+        Extract raw text elements from slide without any structural analysis.
+        
+        This method preserves original text exactly as it appears in the source
+        Google Slides presentation, without applying TextSplitter or ContentAnalyzer.
+        
+        Args:
+            slide_data: Raw slide data from Google Slides API
+            index: Slide position index
+            
+        Returns:
+            Dict with slide metadata and raw_elements list
+        """
+        raw_slide = {
+            'index': index,
+            'slide_id': slide_data.get('objectId'),
+            'raw_elements': []
+        }
+        
+        page_elements = slide_data.get('pageElements', [])
+        
+        for element in page_elements:
+            # Only process shapes with text
+            if 'shape' not in element:
+                continue
+                
+            shape = element['shape']
+            if 'text' not in shape:
+                continue
+            
+            # Extract text content (preserve exact formatting)
+            text_content = ContentParser._extract_text(shape['text'])
+            
+            if not text_content.strip():
+                continue
+            
+            # Get placeholder type (if exists)
+            placeholder = shape.get('placeholder', {})
+            placeholder_type = placeholder.get('type', '')
+            
+            # Get position for ordering
+            transform = element.get('transform', {})
+            position_y = transform.get('translateY', 0)
+            position_x = transform.get('translateX', 0)
+            
+            raw_element = {
+                'type': 'TEXT',
+                'content': text_content,
+                'objectId': element.get('objectId', ''),
+                'position_y': position_y,
+                'position_x': position_x,
+                'placeholder_type': placeholder_type
+            }
+            
+            raw_slide['raw_elements'].append(raw_element)
+        
+        # Sort by vertical position (top to bottom), then horizontal (left to right)
+        raw_slide['raw_elements'].sort(key=lambda e: (e['position_y'], e['position_x']))
+        
+        logger.info(
+            f"Extracted {len(raw_slide['raw_elements'])} raw elements from slide {index}",
+            operation="extract_raw_slide_elements"
+        )
+        
+        return raw_slide
+    
+    @staticmethod
     def _determine_layout_type(slide_data: Dict[str, Any], index: int) -> str:
         """Determine slide layout type based on position and content."""
         # First slide is typically title slide

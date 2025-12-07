@@ -3,7 +3,148 @@
 {% block title %}Редактор слайдов{% endblock %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto">
+<style>
+/* Image Selection and Manipulation Styles */
+.image-wrapper {
+    position: absolute;
+    cursor: pointer;
+    pointer-events: auto !important; /* CRITICAL: Allow clicks on wrapper */
+}
+
+.image-wrapper.selected {
+    outline: 2px solid #3B82F6;
+    outline-offset: 2px;
+}
+
+.image-wrapper img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    pointer-events: none; /* Clicks go through img to wrapper */
+}
+
+/* Resize Handles */
+.resize-handle {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    background: white;
+    border: 2px solid #3B82F6;
+    z-index: 10;
+    pointer-events: auto;
+}
+
+.resize-handle.top-left {
+    top: -4px;
+    left: -4px;
+    cursor: nwse-resize;
+}
+
+.resize-handle.top-right {
+    top: -4px;
+    right: -4px;
+    cursor: nesw-resize;
+}
+
+.resize-handle.bottom-left {
+    bottom: -4px;
+    left: -4px;
+    cursor: nesw-resize;
+}
+
+.resize-handle.bottom-right {
+    bottom: -4px;
+    right: -4px;
+    cursor: nwse-resize;
+}
+
+.resize-handle.top {
+    top: -4px;
+    left: 50%;
+    transform: translateX(-50%);
+    cursor: ns-resize;
+}
+
+.resize-handle.bottom {
+    bottom: -4px;
+    left: 50%;
+    transform: translateX(-50%);
+    cursor: ns-resize;
+}
+
+.resize-handle.left {
+    top: 50%;
+    left: -4px;
+    transform: translateY(-50%);
+    cursor: ew-resize;
+}
+
+.resize-handle.right {
+    top: 50%;
+    right: -4px;
+    transform: translateY(-50%);
+    cursor: ew-resize;
+}
+
+.resize-handle {
+    display: none;
+}
+
+.image-wrapper.selected .resize-handle {
+    display: block;
+}
+
+/* Dragging state */
+.image-wrapper.dragging {
+    cursor: move !important;
+    opacity: 0.8;
+}
+
+.image-wrapper.resizing {
+    opacity: 0.8;
+}
+
+/* Dimension tooltip */
+.dimension-tooltip {
+    position: fixed;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    pointer-events: none;
+    z-index: 1000;
+    display: none;
+}
+
+.dimension-tooltip.active {
+    display: block;
+}
+
+/* Aspect ratio lock indicator */
+.aspect-lock-indicator {
+    position: absolute;
+    top: -24px;
+    right: -24px;
+    background: #3B82F6;
+    color: white;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    pointer-events: none;
+    display: none;
+}
+
+.image-wrapper.selected .aspect-lock-indicator {
+    display: flex;
+}
+</style>
+<div class="mx-auto px-4">
     <div class="mb-6 flex justify-between items-center">
         <h1 class="text-3xl font-bold text-gray-900">Редактор слайдов</h1>
         <div class="flex gap-3">
@@ -26,7 +167,7 @@
 
     <div class="grid grid-cols-12 gap-6">
         <!-- Slides List (Left Panel) -->
-        <div class="col-span-3">
+        <div class="col-span-2">
             <div class="bg-white rounded-lg shadow p-4">
                 <div class="flex justify-between items-center mb-4">
                     <h2 class="text-lg font-bold">Слайды</h2>
@@ -41,8 +182,8 @@
         </div>
 
         <!-- Slide Editor (Center Panel) -->
-        <div class="col-span-6">
-            <div class="bg-white rounded-lg shadow p-6">
+        <div class="col-span-8">
+            <div class="bg-white rounded-lg shadow p-8 lg:p-10">
                 <div class="mb-4 flex justify-between items-center">
                     <h2 class="text-lg font-bold">Слайд <span id="currentSlideNumber">1</span></h2>
                     <button onclick="deleteCurrentSlide()" class="px-3 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600">
@@ -51,15 +192,18 @@
                 </div>
 
                 <!-- Slide Preview -->
-                <div id="slidePreview" class="mb-6 border-2 border-gray-300 rounded-lg overflow-hidden bg-white relative" style="aspect-ratio: 16/9;">
-                    <div id="previewImagesBackground" class="absolute inset-0" style="z-index: 1;"></div>
-                    <div class="absolute inset-0 p-8 flex flex-col" style="z-index: 2;">
+                <div id="slidePreview" class="mb-6 border-2 border-gray-300 rounded-lg bg-white relative" style="aspect-ratio: 16/9; overflow: visible;">
+                    <div id="previewImagesBackground" class="absolute inset-0" style="z-index: 10; pointer-events: none;"></div>
+                    <div class="absolute inset-0 p-8 flex flex-col" style="z-index: 2; pointer-events: none;">
                         <div id="previewTitle" class="text-gray-900 text-3xl font-bold mb-4"></div>
                         <div id="previewMain" class="text-gray-900 text-lg flex-1 overflow-y-auto whitespace-pre-wrap"></div>
                         <div id="previewSecondary" class="text-gray-600 text-sm mt-2"></div>
                     </div>
-                    <div id="previewImagesForeground" class="absolute inset-0" style="z-index: 3;"></div>
+                    <div id="previewImagesForeground" class="absolute inset-0" style="z-index: 20; pointer-events: none;"></div>
                 </div>
+                
+                <!-- Dimension Tooltip -->
+                <div id="dimensionTooltip" class="dimension-tooltip"></div>
 
                 <!-- Text Editors -->
                 <div class="space-y-4">
@@ -78,7 +222,7 @@
                             <span class="text-gray-500 font-normal">(можно использовать списки и заголовки с ":"):</span>
                         </label>
                         <textarea id="mainTextInput" 
-                                  rows="8"
+                                  rows="16"
                                   class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-mono text-sm"
                                   placeholder="Основные цели:&#10;Разработать прототип&#10;Провести тестирование&#10;&#10;• Первый пункт&#10;• Второй пункт"
                                   oninput="updateSlidePreview()"></textarea>
@@ -92,7 +236,7 @@
                             Дополнительный текст
                         </label>
                         <textarea id="secondaryTextInput" 
-                                  rows="2"
+                                  rows="4"
                                   class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                                   placeholder="Сноски, комментарии"
                                   oninput="updateSlidePreview()"></textarea>
@@ -102,12 +246,10 @@
                     <div class="pt-4 border-t">
                         <h3 class="text-sm font-semibold text-gray-700 mb-2">Изображения</h3>
                         <div class="space-y-2">
-                            <button onclick="showImageModal()" class="w-full px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 text-sm">
-                                ➕ Добавить изображение
-                            </button>
                             <div id="imagesList" class="space-y-1 max-h-32 overflow-y-auto">
                                 <!-- Images will be listed here -->
                             </div>
+                            <p class="text-xs text-gray-500">Добавление изображений доступно только через Drag & Drop на превью слайда.</p>
                         </div>
                     </div>
 
@@ -141,7 +283,7 @@
         </div>
 
         <!-- Info Panel -->
-        <div class="col-span-3">
+        <div class="col-span-2">
             <div class="bg-white rounded-lg shadow p-4">
                 <h2 class="text-lg font-bold mb-4">Настройки</h2>
                 
@@ -281,99 +423,57 @@
     </div>
 </div>
 
-<!-- Image Modal -->
+<!-- Image Modal (edit properties only) -->
 <div id="imageModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-    <div class="bg-white rounded-lg p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto">
-        <h3 class="text-lg font-bold mb-4">Добавить изображение</h3>
-        
-        <!-- Upload Method Tabs -->
-        <div class="flex gap-2 mb-4 border-b">
-            <button id="tabUrl" onclick="switchImageTab('url')" class="px-4 py-2 border-b-2 border-blue-500 text-blue-500 font-medium">URL</button>
-            <button id="tabDragDrop" onclick="switchImageTab('dragdrop')" class="px-4 py-2 border-b-2 border-transparent text-gray-500 hover:text-gray-700">Drag & Drop</button>
-            <button id="tabUpload" onclick="switchImageTab('upload')" class="px-4 py-2 border-b-2 border-transparent text-gray-500 hover:text-gray-700">Upload File</button>
-        </div>
-        
-        <!-- Tab Content -->
+    <div class="bg-white rounded-lg p-6 max-w-md w-full">
+        <h3 class="text-lg font-bold mb-4">Настройки изображения</h3>
         <div class="space-y-4">
-            <!-- URL Tab -->
-            <div id="tabContentUrl" class="tab-content">
-                <label class="block text-sm font-medium text-gray-700 mb-2">URL изображения</label>
-                <input type="url" id="imageUrl" class="w-full p-2 border border-gray-300 rounded-lg" placeholder="https://example.com/image.jpg">
-                <p class="text-xs text-gray-500 mt-1">Paste a direct link to an image (JPG, PNG, GIF, WebP, SVG)</p>
-            </div>
-            
-            <!-- Drag & Drop Tab -->
-            <div id="tabContentDragDrop" class="tab-content hidden">
-                <div id="dropZone" class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition">
-                    <p class="text-gray-500 mb-2">📁 Drag image file here or click to browse</p>
-                    <p class="text-xs text-gray-400">Supported: JPG, PNG, GIF, WebP, SVG (max 5MB)</p>
-                    <input type="file" id="dropZoneFileInput" accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml" class="hidden">
-                </div>
-                <p id="dropZoneFileName" class="text-sm text-gray-600 mt-2 hidden"></p>
-            </div>
-            
-            <!-- Upload File Tab -->
-            <div id="tabContentUpload" class="tab-content hidden">
-                <label class="block text-sm font-medium text-gray-700 mb-2">Choose File</label>
-                <input type="file" id="fileUploadInput" accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml" class="w-full p-2 border border-gray-300 rounded-lg">
-                <p class="text-xs text-gray-500 mt-1">Supported formats: JPG, PNG, GIF, WebP, SVG (max 5MB)</p>
-                <div id="fileUploadPreview" class="mt-2 hidden">
-                    <img id="fileUploadThumb" class="max-w-full h-32 object-contain border rounded" />
-                </div>
-            </div>
-            
-            <!-- Common Controls -->
-            <div class="pt-4 border-t space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Position</label>
-                    <div class="grid grid-cols-2 gap-2">
-                        <div>
-                            <label class="block text-xs text-gray-600">X (pixels)</label>
-                            <input type="number" id="imageX" value="100" class="w-full p-2 border border-gray-300 rounded">
-                        </div>
-                        <div>
-                            <label class="block text-xs text-gray-600">Y (pixels)</label>
-                            <input type="number" id="imageY" value="100" class="w-full p-2 border border-gray-300 rounded">
-                        </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Позиция</label>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-xs text-gray-600">X (пиксели)</label>
+                        <input type="number" id="imageX" value="100" class="w-full p-2 border border-gray-300 rounded">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-600">Y (пиксели)</label>
+                        <input type="number" id="imageY" value="100" class="w-full p-2 border border-gray-300 rounded">
                     </div>
                 </div>
-                
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Size</label>
-                    <div class="grid grid-cols-2 gap-2">
-                        <div>
-                            <label class="block text-xs text-gray-600">Width (pixels)</label>
-                            <input type="number" id="imageWidth" value="200" class="w-full p-2 border border-gray-300 rounded" oninput="handleImageSizeChange('width')">
-                        </div>
-                        <div>
-                            <label class="block text-xs text-gray-600">Height (pixels)</label>
-                            <input type="number" id="imageHeight" value="150" class="w-full p-2 border border-gray-300 rounded" oninput="handleImageSizeChange('height')">
-                        </div>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Размер</label>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-xs text-gray-600">Ширина (пиксели)</label>
+                        <input type="number" id="imageWidth" value="200" class="w-full p-2 border border-gray-300 rounded" oninput="handleImageSizeChange('width')">
                     </div>
-                    <label class="flex items-center mt-2 text-sm">
-                        <input type="checkbox" id="imageAspectLock" checked class="mr-2">
-                        <span class="text-gray-700">🔗 Lock aspect ratio</span>
+                    <div>
+                        <label class="block text-xs text-gray-600">Высота (пиксели)</label>
+                        <input type="number" id="imageHeight" value="150" class="w-full p-2 border border-gray-300 rounded" oninput="handleImageSizeChange('height')">
+                    </div>
+                </div>
+                <label class="flex items-center mt-2 text-sm">
+                    <input type="checkbox" id="imageAspectLock" checked class="mr-2">
+                    <span class="text-gray-700">🔗 Фиксировать пропорции</span>
+                </label>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Слой</label>
+                <div class="flex gap-4">
+                    <label class="flex items-center">
+                        <input type="radio" name="imageLayer" value="background" checked class="mr-2">
+                        <span class="text-sm">Позади текста</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="radio" name="imageLayer" value="foreground" class="mr-2">
+                        <span class="text-sm">Перед текстом</span>
                     </label>
                 </div>
-                
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Layer</label>
-                    <div class="flex gap-4">
-                        <label class="flex items-center">
-                            <input type="radio" name="imageLayer" value="background" checked class="mr-2">
-                            <span class="text-sm">Behind Text</span>
-                        </label>
-                        <label class="flex items-center">
-                            <input type="radio" name="imageLayer" value="foreground" class="mr-2">
-                            <span class="text-sm">In Front of Text</span>
-                        </label>
-                    </div>
-                </div>
             </div>
         </div>
-        
         <div class="flex gap-2 mt-6">
-            <button onclick="addImage()" class="flex-1 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600">Добавить</button>
+            <button onclick="addImage()" class="flex-1 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600">Сохранить</button>
             <button onclick="closeImageModal()" class="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400">Отмена</button>
         </div>
     </div>
@@ -500,6 +600,7 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('DEBUG: Loaded slides data:', slides);
     console.log('DEBUG: First slide:', slides[0]);
     loadSettings();
+    loadSlidesFromStorage();  // Load saved slides from localStorage
     initializeSlideData();
     renderSlidesList();
     loadSlide(0);
@@ -508,6 +609,20 @@ document.addEventListener('DOMContentLoaded', () => {
     // Check if we have a generated presentation from previous run
     if (jobId && jobId !== 'default') {
         checkForGeneratedPresentation(jobId);
+    }
+    
+    // Add click handler to slide preview for deselecting images
+    const slidePreview = document.getElementById('slidePreview');
+    if (slidePreview) {
+        slidePreview.addEventListener('click', (e) => {
+            // Only deselect if clicking directly on preview background, not on images
+            if (e.target === slidePreview || 
+                e.target === document.getElementById('previewImagesBackground') ||
+                e.target === document.getElementById('previewImagesForeground')) {
+                console.log('=== PREVIEW BACKGROUND CLICKED ===');
+                deselectAllImages();
+            }
+        });
     }
     
     // Setup drag-and-drop for slide preview
@@ -616,6 +731,9 @@ function saveCurrentSlide() {
         tables: slides[currentSlideIndex].tables || [],
         arrows: slides[currentSlideIndex].arrows || []
     };
+    
+    // Persist to localStorage
+    saveSlides();
 }
 
 function updateSlidePreview() {
@@ -643,47 +761,112 @@ function renderPreviewImages() {
     bgContainer.innerHTML = '';
     fgContainer.innerHTML = '';
     
+    // Deselect all images when re-rendering
+    deselectAllImages();
+    
     // Separate images by layer
     const backgroundImages = images.filter(img => img.layer !== 'foreground');
     const foregroundImages = images.filter(img => img.layer === 'foreground');
     
-    // Render background images
+    // Render background images with wrappers
     backgroundImages.forEach(img => {
-        const imgEl = document.createElement('img');
-        imgEl.src = img.url;
-        imgEl.style.position = 'absolute';
-        imgEl.style.left = `${img.position.x}px`;
-        imgEl.style.top = `${img.position.y}px`;
-        imgEl.style.width = `${img.size.width}px`;
-        imgEl.style.height = `${img.size.height}px`;
-        imgEl.style.objectFit = 'cover';
-        imgEl.style.pointerEvents = 'none';
-        imgEl.onerror = function() {
-            this.style.border = '2px dashed #ccc';
-            this.style.background = '#f0f0f0';
-            this.alt = 'Image failed to load';
-        };
-        bgContainer.appendChild(imgEl);
+        const wrapper = createImageWrapper(img);
+        bgContainer.appendChild(wrapper);
+        console.log('Appended wrapper to bgContainer:', wrapper);
+        console.log('Wrapper is in DOM:', document.contains(wrapper));
     });
     
-    // Render foreground images
+    // Render foreground images with wrappers
     foregroundImages.forEach(img => {
-        const imgEl = document.createElement('img');
-        imgEl.src = img.url;
-        imgEl.style.position = 'absolute';
-        imgEl.style.left = `${img.position.x}px`;
-        imgEl.style.top = `${img.position.y}px`;
-        imgEl.style.width = `${img.size.width}px`;
-        imgEl.style.height = `${img.size.height}px`;
-        imgEl.style.objectFit = 'cover';
-        imgEl.style.pointerEvents = 'none';
-        imgEl.onerror = function() {
-            this.style.border = '2px dashed #ccc';
-            this.style.background = '#f0f0f0';
-            this.alt = 'Image failed to load';
-        };
-        fgContainer.appendChild(imgEl);
+        const wrapper = createImageWrapper(img);
+        fgContainer.appendChild(wrapper);
+        console.log('Appended wrapper to fgContainer:', wrapper);
+        console.log('Wrapper is in DOM:', document.contains(wrapper));
     });
+    
+    // Initialize Interact.js on all new image wrappers
+    // Use setTimeout to ensure DOM is updated
+    setTimeout(() => {
+        if (typeof interact !== 'undefined') {
+            console.log('renderPreviewImages: Calling initializeImageInteractions');
+            initializeImageInteractions();
+        } else {
+            console.warn('renderPreviewImages: Interact.js not loaded yet, skipping initialization');
+        }
+    }, 50);
+}
+
+function createImageWrapper(imageData) {
+    // Create wrapper div
+    const wrapper = document.createElement('div');
+    wrapper.className = 'image-wrapper';
+    wrapper.dataset.imageId = imageData.id;
+    wrapper.style.left = `${imageData.position.x}px`;
+    wrapper.style.top = `${imageData.position.y}px`;
+    wrapper.style.width = `${imageData.size.width}px`;
+    wrapper.style.height = `${imageData.size.height}px`;
+    
+    console.log('Creating wrapper for image:', imageData.id);
+    console.log('Wrapper position:', imageData.position);
+    console.log('Wrapper size:', imageData.size);
+    
+    // Create image element
+    const imgEl = document.createElement('img');
+    imgEl.src = imageData.url;
+    imgEl.onerror = function() {
+        this.style.border = '2px dashed #ccc';
+        this.style.background = '#f0f0f0';
+        this.alt = 'Image failed to load';
+    };
+    wrapper.appendChild(imgEl);
+    
+    // Create resize handles
+    const handles = ['top-left', 'top', 'top-right', 'right', 'bottom-right', 'bottom', 'bottom-left', 'left'];
+    handles.forEach(handlePos => {
+        const handle = document.createElement('div');
+        handle.className = `resize-handle ${handlePos}`;
+        handle.dataset.handle = handlePos;
+        wrapper.appendChild(handle);
+    });
+    
+    // Create aspect ratio lock indicator
+    if (imageData.aspectLocked !== false) {
+        const lockIndicator = document.createElement('div');
+        lockIndicator.className = 'aspect-lock-indicator';
+        lockIndicator.innerHTML = '🔒';
+        lockIndicator.title = 'Aspect ratio locked';
+        wrapper.appendChild(lockIndicator);
+    }
+    
+    // Click to select - Add MULTIPLE listeners for debugging
+    wrapper.onclick = function(e) {
+        console.log('=== ONCLICK FIRED ===');
+        console.log('Image ID:', imageData.id);
+        selectImage(imageData.id);
+        e.stopPropagation();
+    };
+    
+    wrapper.addEventListener('click', (e) => {
+        e.stopPropagation();
+        console.log('=== WRAPPER CLICKED ===');
+        console.log('Image ID:', imageData.id);
+        console.log('Event target:', e.target);
+        console.log('Wrapper element:', wrapper);
+        selectImage(imageData.id);
+    }, true); // Use capture phase
+    
+    wrapper.addEventListener('mousedown', (e) => {
+        console.log('=== MOUSEDOWN on wrapper ===', imageData.id);
+    });
+    
+    // Double-click to edit
+    wrapper.addEventListener('dblclick', (e) => {
+        e.stopPropagation();
+        console.log('Image double-clicked!', imageData.id);
+        editImage(imageData.id);
+    });
+    
+    return wrapper;
 }
 
 function formatMainText(text) {
@@ -888,6 +1071,37 @@ function loadSettings() {
     }
 }
 
+// Slides data persistence functions
+function saveSlides() {
+    try {
+        localStorage.setItem(
+            'slides_data_' + jobId,
+            JSON.stringify(slides)
+        );
+        console.log('Slides saved to localStorage');
+    } catch (e) {
+        console.warn('Failed to save slides to localStorage:', e);
+    }
+}
+
+function loadSlidesFromStorage() {
+    try {
+        const stored = localStorage.getItem('slides_data_' + jobId);
+        if (stored) {
+            const savedSlides = JSON.parse(stored);
+            // Merge saved data with server data - prefer saved if same number of slides
+            if (savedSlides.length === slides.length) {
+                slides = savedSlides;
+                console.log('Slides loaded from localStorage');
+            } else {
+                console.log('Slide count mismatch, using server data');
+            }
+        }
+    } catch (e) {
+        console.warn('Failed to load slides from localStorage:', e);
+    }
+}
+
 // Page orientation control
 function applyPageOrientation() {
     const orientation = document.getElementById('pageOrientation').value;
@@ -897,8 +1111,8 @@ function applyPageOrientation() {
     if (orientation === 'vertical') {
         // Portrait: keep height constrained and derive width from aspect ratio
         preview.style.aspectRatio = '9/16';
-        preview.style.height = '70vh';
-        preview.style.maxHeight = '70vh';
+        preview.style.height = '90vh';
+        preview.style.maxHeight = '90vh';
         preview.style.width = 'auto';
         preview.style.maxWidth = '100%';
         preview.style.display = 'inline-block';
@@ -908,7 +1122,7 @@ function applyPageOrientation() {
         // Landscape: fill width but cap height
         preview.style.aspectRatio = '16/9';
         preview.style.height = 'auto';
-        preview.style.maxHeight = '70vh';
+        preview.style.maxHeight = '85vh';
         preview.style.width = '100%';
         preview.style.display = 'block';
         preview.style.marginLeft = '';
@@ -996,30 +1210,14 @@ function closeImageModal() {
 }
 
 function resetImageModal() {
-    // Reset all inputs
-    document.getElementById('imageUrl').value = '';
+    // Reset controls
     document.getElementById('imageX').value = '100';
     document.getElementById('imageY').value = '100';
     document.getElementById('imageWidth').value = '200';
     document.getElementById('imageHeight').value = '150';
     document.getElementById('imageAspectLock').checked = true;
     document.querySelector('input[name="imageLayer"][value="background"]').checked = true;
-    
-    // Reset file inputs
-    const dropZoneInput = document.getElementById('dropZoneFileInput');
-    const fileUploadInput = document.getElementById('fileUploadInput');
-    if (dropZoneInput) dropZoneInput.value = '';
-    if (fileUploadInput) fileUploadInput.value = '';
-    
-    // Hide previews
-    document.getElementById('dropZoneFileName').classList.add('hidden');
-    document.getElementById('fileUploadPreview').classList.add('hidden');
-    
-    // Reset aspect ratio
     currentImageAspectRatio = null;
-    
-    // Switch to URL tab
-    switchImageTab('url');
 }
 
 function switchImageTab(mode) {
@@ -1128,69 +1326,40 @@ function processImageFile(file) {
 }
 
 function addImage() {
-    let url = document.getElementById('imageUrl').value.trim();
-    
-    console.log('addImage called, URL:', url);
-    console.log('Current mode:', currentImageMode);
-    
-    // Validate URL or check for file upload
-    if (!url) {
-        alert('Введите URL изображения или выберите файл!');
-        console.error('No URL provided');
+    // Only allow saving changes to existing images via modal
+    if (!currentEditingImageId) {
+        alert('Добавление изображений доступно только через Drag & Drop на превью слайда');
         return;
     }
     
-    // Validate URL format if it's not a data URL
-    if (!url.startsWith('data:') && !url.match(/^https?:\/\//i)) {
-        alert('Please enter a valid image URL (must start with http:// or https://)');
-        console.error('Invalid URL format:', url);
-        return;
-    }
+    const image = slides[currentSlideIndex].images.find(img => img.id === currentEditingImageId);
+    if (!image) return;
     
-    const layer = document.querySelector('input[name="imageLayer"]:checked')?.value || 'background';
-    const width = parseInt(document.getElementById('imageWidth').value) || 200;
-    const height = parseInt(document.getElementById('imageHeight').value) || 150;
+    const layer = document.querySelector('input[name="imageLayer"]:checked')?.value || image.layer || 'background';
+    const width = parseInt(document.getElementById('imageWidth').value) || image.size.width;
+    const height = parseInt(document.getElementById('imageHeight').value) || image.size.height;
+    const aspectLocked = document.getElementById('imageAspectLock').checked;
     
-    console.log('Creating image with:', { url, layer, width, height });
-    
-    const imageData = {
-        id: currentEditingImageId || 'img_' + Date.now(),
-        url: url,
+    const updatedImage = {
+        ...image,
         position: {
-            x: parseInt(document.getElementById('imageX').value) || 100,
-            y: parseInt(document.getElementById('imageY').value) || 100
+            x: parseInt(document.getElementById('imageX').value) || image.position.x,
+            y: parseInt(document.getElementById('imageY').value) || image.position.y
         },
-        size: {
-            width: width,
-            height: height
-        },
+        size: { width, height },
         layer: layer,
-        aspectRatio: currentImageAspectRatio || (width / height),
-        aspectLocked: document.getElementById('imageAspectLock').checked
+        aspectRatio: image.aspectRatio || (width / height),
+        aspectLocked: aspectLocked
     };
     
-    if (!slides[currentSlideIndex].images) {
-        slides[currentSlideIndex].images = [];
+    const index = slides[currentSlideIndex].images.findIndex(img => img.id === currentEditingImageId);
+    if (index !== -1) {
+        slides[currentSlideIndex].images[index] = updatedImage;
     }
     
-    if (currentEditingImageId) {
-        // Update existing image
-        const index = slides[currentSlideIndex].images.findIndex(img => img.id === currentEditingImageId);
-        if (index !== -1) {
-            slides[currentSlideIndex].images[index] = imageData;
-            console.log('Updated image at index:', index);
-        }
-    } else {
-        // Add new image
-        slides[currentSlideIndex].images.push(imageData);
-        console.log('Added new image, total images:', slides[currentSlideIndex].images.length);
-    }
-    
-    console.log('Updating lists and preview...');
     updateImagesList();
     updateSlidePreview();
     closeImageModal();
-    console.log('Image added successfully');
 }
 
 function editImage(imageId) {
@@ -1201,7 +1370,6 @@ function editImage(imageId) {
     currentImageAspectRatio = image.aspectRatio || (image.size.width / image.size.height);
     
     // Fill modal with image data
-    document.getElementById('imageUrl').value = image.url;
     document.getElementById('imageX').value = image.position.x;
     document.getElementById('imageY').value = image.position.y;
     document.getElementById('imageWidth').value = image.size.width;
@@ -1496,4 +1664,301 @@ function setupFileInputHandlers() {
     }
 }
 </script>
+<script>
+// ===== Interactive Image Manipulation Module =====
+// Handles selection, drag, resize with Interact.js
+
+let selectedImageId = null;
+const dimensionTooltip = document.getElementById('dimensionTooltip');
+
+// Debounce utility
+function debounce(func, delay) {
+    let timeoutId;
+    return function(...args) {
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => func.apply(this, args), delay);
+    };
+}
+
+// Save slide data after interactions (debounced)
+const debouncedSave = debounce(() => {
+    saveCurrentSlide();
+    updateImagesList();
+}, 500);
+
+// Selection management
+function selectImage(imageId) {
+    console.log('selectImage called for:', imageId);
+    // Deselect all first
+    deselectAllImages();
+    
+    // Select the clicked image
+    const wrapper = document.querySelector(`.image-wrapper[data-image-id="${imageId}"]`);
+    console.log('Found wrapper:', wrapper);
+    if (wrapper) {
+        wrapper.classList.add('selected');
+        selectedImageId = imageId;
+        console.log('Image selected, selectedImageId:', selectedImageId);
+    } else {
+        console.error('Wrapper not found for imageId:', imageId);
+    }
+}
+
+function deselectAllImages() {
+    document.querySelectorAll('.image-wrapper.selected').forEach(wrapper => {
+        wrapper.classList.remove('selected');
+    });
+    selectedImageId = null;
+}
+
+// Click on slide background to deselect
+document.addEventListener('DOMContentLoaded', () => {
+    const slidePreview = document.getElementById('slidePreview');
+    if (slidePreview) {
+        slidePreview.addEventListener('click', (e) => {
+            // Only deselect if clicking directly on the preview background
+            if (e.target === slidePreview || e.target.id === 'previewImagesBackground' || e.target.id === 'previewImagesForeground') {
+                deselectAllImages();
+            }
+        });
+    }
+});
+
+// Initialize Interact.js on all image wrappers
+function initializeImageInteractions() {
+    // Check if Interact.js is loaded
+    if (typeof interact === 'undefined') {
+        console.error('Interact.js not loaded yet');
+        return;
+    }
+    
+    const wrappers = document.querySelectorAll('.image-wrapper');
+    console.log('Initializing Interact.js on', wrappers.length, 'image wrappers');
+    
+    wrappers.forEach(wrapper => {
+        const imageId = wrapper.dataset.imageId;
+        const imageData = getImageData(imageId);
+        
+        if (!imageData) return;
+        
+        // Configure draggable
+        interact(wrapper)
+            .draggable({
+                inertia: false,
+                modifiers: [
+                    interact.modifiers.restrictRect({
+                        restriction: 'parent',
+                        endOnly: true
+                    })
+                ],
+                listeners: {
+                    start: (event) => {
+                        event.target.classList.add('dragging');
+                    },
+                    move: (event) => {
+                        const target = event.target;
+                        const imageData = getImageData(imageId);
+                        
+                        // Update position
+                        const x = (parseFloat(target.style.left) || 0) + event.dx;
+                        const y = (parseFloat(target.style.top) || 0) + event.dy;
+                        
+                        target.style.left = `${x}px`;
+                        target.style.top = `${y}px`;
+                        
+                        // Update data model
+                        if (imageData) {
+                            imageData.position.x = Math.round(x);
+                            imageData.position.y = Math.round(y);
+                        }
+                        
+                        // Show position tooltip
+                        showDimensionTooltip(
+                            event.clientX + 10,
+                            event.clientY + 10,
+                            `X: ${Math.round(x)}px, Y: ${Math.round(y)}px`
+                        );
+                    },
+                    end: (event) => {
+                        event.target.classList.remove('dragging');
+                        hideDimensionTooltip();
+                        debouncedSave();
+                    }
+                }
+            })
+            .resizable({
+                edges: { left: true, right: true, bottom: true, top: true },
+                modifiers: [
+                    interact.modifiers.restrictSize({
+                        min: { width: 20, height: 20 }
+                    }),
+                    // Apply aspect ratio modifier if locked
+                    ...(imageData.aspectLocked !== false ? [
+                        interact.modifiers.aspectRatio({
+                            ratio: imageData.aspectRatio || (imageData.size.width / imageData.size.height),
+                            modifiers: [interact.modifiers.restrictSize({ min: { width: 20, height: 20 } })]
+                        })
+                    ] : [])
+                ],
+                listeners: {
+                    start: (event) => {
+                        event.target.classList.add('resizing');
+                        // Initialize position data from current styles
+                        const target = event.target;
+                        target.dataset.x = parseFloat(target.style.left) || 0;
+                        target.dataset.y = parseFloat(target.style.top) || 0;
+                    },
+                    move: (event) => {
+                        const target = event.target;
+                        const imageData = getImageData(imageId);
+                        
+                        let { x, y } = target.dataset;
+                        x = (parseFloat(x) || 0) + event.deltaRect.left;
+                        y = (parseFloat(y) || 0) + event.deltaRect.top;
+                        
+                        // Update element style
+                        target.style.width = `${event.rect.width}px`;
+                        target.style.height = `${event.rect.height}px`;
+                        target.style.left = `${x}px`;
+                        target.style.top = `${y}px`;
+                        
+                        // Store position for next move
+                        target.dataset.x = x;
+                        target.dataset.y = y;
+                        
+                        // Update data model
+                        if (imageData) {
+                            imageData.size.width = Math.round(event.rect.width);
+                            imageData.size.height = Math.round(event.rect.height);
+                            imageData.position.x = Math.round(x);
+                            imageData.position.y = Math.round(y);
+                        }
+                        
+                        // Show dimension tooltip
+                        showDimensionTooltip(
+                            event.clientX + 10,
+                            event.clientY + 10,
+                            `${Math.round(event.rect.width)} × ${Math.round(event.rect.height)}px`
+                        );
+                    },
+                    end: (event) => {
+                        event.target.classList.remove('resizing');
+                        const imageData = getImageData(imageId);
+                        
+                        // Recalculate aspect ratio after resize
+                        if (imageData) {
+                            imageData.aspectRatio = imageData.size.width / imageData.size.height;
+                        }
+                        
+                        hideDimensionTooltip();
+                        debouncedSave();
+                    }
+                }
+            });
+    });
+}
+
+// Helper to get image data from slides array
+function getImageData(imageId) {
+    const images = slides[currentSlideIndex]?.images || [];
+    return images.find(img => img.id === imageId);
+}
+
+// Dimension tooltip functions
+function showDimensionTooltip(x, y, text) {
+    if (dimensionTooltip) {
+        dimensionTooltip.textContent = text;
+        dimensionTooltip.style.left = `${x}px`;
+        dimensionTooltip.style.top = `${y}px`;
+        dimensionTooltip.classList.add('active');
+    }
+}
+
+function hideDimensionTooltip() {
+    if (dimensionTooltip) {
+        dimensionTooltip.classList.remove('active');
+    }
+}
+
+// Keyboard shortcuts (optional)
+document.addEventListener('keydown', (e) => {
+    if (!selectedImageId) return;
+    
+    // Delete key - remove selected image
+    if (e.key === 'Delete') {
+        e.preventDefault();
+        removeImage(selectedImageId);
+    }
+    
+    // Escape key - deselect
+    if (e.key === 'Escape') {
+        e.preventDefault();
+        deselectAllImages();
+    }
+    
+    // Arrow keys - nudge position
+    const imageData = getImageData(selectedImageId);
+    if (imageData && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        e.preventDefault();
+        const step = e.shiftKey ? 10 : 1;
+        
+        switch(e.key) {
+            case 'ArrowUp':
+                imageData.position.y = Math.max(0, imageData.position.y - step);
+                break;
+            case 'ArrowDown':
+                imageData.position.y += step;
+                break;
+            case 'ArrowLeft':
+                imageData.position.x = Math.max(0, imageData.position.x - step);
+                break;
+            case 'ArrowRight':
+                imageData.position.x += step;
+                break;
+        }
+        
+        // Update visual
+        const wrapper = document.querySelector(`.image-wrapper[data-image-id="${selectedImageId}"]`);
+        if (wrapper) {
+            wrapper.style.left = `${imageData.position.x}px`;
+            wrapper.style.top = `${imageData.position.y}px`;
+        }
+        
+        debouncedSave();
+    }
+});
+</script>
+
+<!-- Interact.js Library - Load at end after DOM elements exist -->
+<script src="https://cdn.jsdelivr.net/npm/interactjs@1.10.19/dist/interact.min.js"></script>
+
+<script>
+// Wait for Interact.js to load, then initialize interactions
+(function waitForInteract() {
+    if (typeof interact !== 'undefined') {
+        console.log('Interact.js loaded successfully');
+        // Re-initialize interactions after library loads with multiple attempts
+        setTimeout(() => {
+            console.log('Calling initializeImageInteractions...');
+            initializeImageInteractions();
+        }, 100);
+        
+        // Try again after 500ms to catch any late-rendered images
+        setTimeout(() => {
+            console.log('Re-initializing after 500ms...');
+            initializeImageInteractions();
+        }, 500);
+        
+        // And again after 1 second
+        setTimeout(() => {
+            console.log('Re-initializing after 1s...');
+            initializeImageInteractions();
+        }, 1000);
+    } else {
+        console.log('Waiting for Interact.js...');
+        setTimeout(waitForInteract, 50);
+    }
+})();
+</script>
+
 {% endblock %}

@@ -56,7 +56,7 @@ def index():
 def process():
     """Extract presentation and redirect to editor."""
     presentation_url = request.form.get('presentation_url')
-    template_name = request.form.get('template_name', 'default')
+    # Template selection removed - no longer needed
     
     if not presentation_url:
         return jsonify({'error': 'Presentation URL is required'}), 400
@@ -66,7 +66,7 @@ def process():
     jobs[job_id] = {
         'id': job_id,
         'url': presentation_url,
-        'template': template_name,
+        'template': None,  # No template needed
         'status': 'extracting',
         'created_at': datetime.now().isoformat(),
         'result': None,
@@ -76,7 +76,7 @@ def process():
     # Extract content in background thread
     thread = threading.Thread(
         target=extract_for_editor,
-        args=(job_id, presentation_url, template_name)
+        args=(job_id, presentation_url)
     )
     thread.daemon = True
     thread.start()
@@ -84,8 +84,8 @@ def process():
     return redirect(url_for('extraction_status', job_id=job_id))
 
 
-def extract_for_editor(job_id, presentation_url, template_name):
-    """Extract presentation content for editor."""
+def extract_for_editor(job_id, presentation_url):
+    """Extract presentation content for editor - preserve exact 1:1 structure from Google Slides."""
     try:
         from presentation_design.extraction.slides_extractor import SlidesExtractor
         from presentation_design.extraction.content_parser import ContentParser
@@ -103,53 +103,60 @@ def extract_for_editor(job_id, presentation_url, template_name):
         )
         oauth_manager.authenticate()
         
-        # Extract content (already parsed by extractor)
+        # Extract content in RAW MODE (preserve original text)
         extractor = SlidesExtractor(oauth_manager)
-        parsed_data = extractor.extract_presentation(presentation_url)
+        raw_data = extractor.extract_presentation(presentation_url, raw_mode=True)
         
-        print(f"DEBUG: Parsed {len(parsed_data.get('slides', []))} slides")
+        print(f"DEBUG: Extracted {len(raw_data.get('slides', []))} slides in raw mode")
         
-        # Convert parsed data to editor format
+        # Convert raw data to editor format - ALL TEXT goes to mainText, preserve 1:1 order
         slides = []
-        for idx, slide in enumerate(parsed_data.get('slides', [])):
+        for idx, slide in enumerate(raw_data.get('slides', [])):
+            raw_elements = slide.get('raw_elements', [])
+            print(f"\n=== DEBUG: Slide {idx} ===")
+            print(f"Total raw elements: {len(raw_elements)}")
+            
+            # Collect ALL text in the EXACT order it appears
+            all_text_parts = []
+            
+            for i, element in enumerate(raw_elements):
+                content = element.get('content', '')
+                placeholder_type = element.get('placeholder_type', '')
+                
+                # Clean up special characters: replace vertical tab and other whitespace with regular space
+                content = content.replace('\v', ' ').replace('\r', ' ')
+                
+                print(f"  Element {i}: type='{placeholder_type}', content_length={len(content)}, preview='{content[:80] if content else '(empty)'}...")
+                
+                # Add ALL non-empty content to mainText
+                if content.strip():
+                    all_text_parts.append(content)
+                    print(f"    -> Added to mainText")
+                else:
+                    print(f"    -> Skipped (empty)")
+            
+            # Create editor slide: ALL text in mainText, title empty
             editor_slide = {
-                'title': '',
-                'mainText': '',
-                'secondaryText': ''
+                'title': '',  # No title separation
+                'mainText': '\n\n'.join(all_text_parts),  # ALL text here
+                'secondaryText': '',
+                'original_objectIds': [el.get('objectId', '') for el in raw_elements]
             }
             
-            elements = slide.get('elements', [])
-            print(f"DEBUG: Slide {idx} has {len(elements)} elements")
-            
-            for element in elements:
-                if element.get('type') == 'TEXT':
-                    role = element.get('role', 'BODY').upper()
-                    content = element.get('content', '')
-                    print(f"DEBUG: Slide {idx}, role={role}, content_preview={content[:50] if content else 'empty'}")
-                    
-                    if role in ['TITLE', 'SUBTITLE']:
-                        if editor_slide['title']:
-                            editor_slide['title'] += '\n' + content
-                        else:
-                            editor_slide['title'] = content
-                    elif role in ['BODY', 'HEADING']:
-                        if editor_slide['mainText']:
-                            editor_slide['mainText'] += '\n' + content
-                        else:
-                            editor_slide['mainText'] = content
-                    elif role == 'FOOTER':
-                        if editor_slide['secondaryText']:
-                            editor_slide['secondaryText'] += '\n' + content
-                        else:
-                            editor_slide['secondaryText'] = content
-            
-            print(f"DEBUG: Slide {idx} editor format: title={len(editor_slide['title'])}, main={len(editor_slide['mainText'])}, secondary={len(editor_slide['secondaryText'])}")
+            print(f"\n  RESULT: mainText_length={len(editor_slide['mainText'])}")
+            print(f"  MainText preview: '{editor_slide['mainText'][:150]}...'" if editor_slide['mainText'] else "  MainText: (empty)")
             slides.append(editor_slide)
         
         print(f"DEBUG: Total slides for editor: {len(slides)}")
+        print(f"\nDEBUG: Slide 0 data being saved to jobs:")
+        if slides:
+            print(f"  title: '{slides[0].get('title')}'")
+            print(f"  mainText length: {len(slides[0].get('mainText', ''))}")
+            print(f"  mainText preview: '{slides[0].get('mainText', '')[:100]}'")
         jobs[job_id]['status'] = 'extracted'
         jobs[job_id]['slides'] = slides
         jobs[job_id]['completed_at'] = datetime.now().isoformat()
+        print(f"\nDEBUG: Saved to jobs['{job_id}']['slides'], count: {len(jobs[job_id]['slides'])}")
         
     except Exception as e:
         print(f"Error extracting presentation: {e}")
@@ -205,6 +212,15 @@ def slide_editor():
     # Get available templates
     templates = get_template_list()
     
+    print(f"\n=== SLIDE EDITOR DEBUG ===")
+    print(f"Rendering slide_editor with {len(slides_data)} slides")
+    if slides_data:
+        print(f"First slide data:")
+        print(f"  title: '{slides_data[0].get('title')}'")
+        print(f"  mainText length: {len(slides_data[0].get('mainText', ''))}")
+        print(f"  mainText preview: '{slides_data[0].get('mainText', '')[:100]}'")
+    print(f"=========================\n")
+    
     return render_template('slide_editor.html',
                           presentation_url=presentation_url,
                           template=template,
@@ -241,7 +257,8 @@ def process_slides():
     slides = data.get('slides', [])
     template_name = data.get('template', 'default')
     presentation_url = data.get('presentation_url')
-    existing_presentation_id = data.get('existing_presentation_id')  # NEW: for updates
+    existing_presentation_id = data.get('existing_presentation_id')  # For updates
+    settings = data.get('settings', {})  # NEW: presentation settings
     
     job_id = str(uuid.uuid4())[:8]
     jobs[job_id] = {
@@ -252,7 +269,8 @@ def process_slides():
         'created_at': datetime.now().isoformat(),
         'result': None,
         'error': None,
-        'existing_presentation_id': existing_presentation_id  # Store for updates
+        'existing_presentation_id': existing_presentation_id,
+        'settings': settings  # Store settings
     }
     
     # Process with edited slides
@@ -294,12 +312,9 @@ def process_slides_direct():
     return redirect(url_for('job_status', job_id=job_id))
 
 
-def process_slides_in_background(job_id, slides, template_name, existing_presentation_id=None):
-    """Process edited slides in background."""
+def process_slides_in_background(job_id, slides, template_name=None, existing_presentation_id=None):
+    """Process edited slides in background - create presentation with advanced formatting."""
     try:
-        from presentation_design.main import process_presentation
-        from presentation_design.templates.template_loader import TemplateLoader
-        from presentation_design.design.design_applicator import DesignApplicator
         from presentation_design.generation.presentation_builder import PresentationBuilder
         from presentation_design.utils.config import get_config
         from presentation_design.auth.oauth_manager import OAuthManager
@@ -313,102 +328,25 @@ def process_slides_in_background(job_id, slides, template_name, existing_present
         )
         oauth_manager.authenticate()
         
-        # Load template
-        template_config = config.get_section('templates')
-        template_loader = TemplateLoader(
-            str(config.get_absolute_path(template_config['template_directory']))
-        )
-        template = template_loader.load_template(template_name)
-        
-        # Create presentation data from editor slides
-        presentation_data = {
-            'presentation_id': 'editor',
-            'title': 'Edited Presentation',
-            'slides': []
-        }
-        
-        for idx, slide in enumerate(slides):
-            slide_data = {
-                'index': idx,
-                'slide_id': f'slide_{idx}',
-                'layout_type': 'TITLE' if idx == 0 else 'CONTENT',
-                'elements': []
-            }
-            
-            # Add title if present
-            if slide.get('title'):
-                slide_data['elements'].append({
-                    'type': 'TEXT',
-                    'content': slide['title'],
-                    'role': 'TITLE',
-                    'position': {},
-                    'text_analysis': {
-                        'content_type': 'plain',
-                        'items': [],
-                        'has_emphasis': False,
-                        'is_title_case': True,
-                        'original_text': slide['title']
-                    }
-                })
-            
-            # Add main text if present
-            if slide.get('mainText'):
-                # Check if it's a list
-                main_text = slide['mainText']
-                is_list = '\n•' in main_text or '\n-' in main_text or any(line.strip().startswith(str(i)+'.') for i in range(1,10) for line in main_text.split('\n'))
-                
-                slide_data['elements'].append({
-                    'type': 'TEXT',
-                    'content': main_text,
-                    'role': 'BODY',
-                    'position': {},
-                    'text_analysis': {
-                        'content_type': 'bullet_list' if is_list else 'plain',
-                        'items': main_text.split('\n') if is_list else [],
-                        'has_emphasis': False,
-                        'is_title_case': False,
-                        'original_text': main_text
-                    }
-                })
-            
-            # Add secondary text if present
-            if slide.get('secondaryText'):
-                slide_data['elements'].append({
-                    'type': 'TEXT',
-                    'content': slide['secondaryText'],
-                    'role': 'FOOTER',
-                    'position': {},
-                    'text_analysis': {
-                        'content_type': 'plain',
-                        'items': [],
-                        'has_emphasis': False,
-                        'is_title_case': False,
-                        'original_text': slide['secondaryText']
-                    }
-                })
-            
-            presentation_data['slides'].append(slide_data)
-        
-        # Apply design
-        applicator = DesignApplicator(template)
-        designed_data = applicator.apply_design(presentation_data)
-        
-        # Build or update presentation
+        # Build presentation with advanced formatting
         builder = PresentationBuilder(oauth_manager)
         
-        if existing_presentation_id:
-            # UPDATE existing presentation
-            print(f"Updating existing presentation: {existing_presentation_id}")
-            result = builder.update_presentation(existing_presentation_id, designed_data)
-        else:
-            # CREATE new presentation
-            print(f"Creating new presentation")
-            result = builder.build_presentation(designed_data)
+        # Get presentation settings from job data
+        settings = jobs[job_id].get('settings', {})
+        
+        print(f"Creating presentation with {len(slides)} slides")
+        print(f"Settings: {settings}")
+        
+        result = builder.build_simple_presentation(
+            slides_data=slides,
+            title="New Presentation",
+            settings=settings
+        )
         
         jobs[job_id].update({
             'status': 'completed',
             'result': result,
-            'generated_presentation_id': result.get('presentation_id')  # Store for future updates
+            'generated_presentation_id': result.get('presentation_id')
         })
         
     except Exception as e:

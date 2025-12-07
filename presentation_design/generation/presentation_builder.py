@@ -37,6 +37,250 @@ class PresentationBuilder:
             self.slides_service = self.oauth_manager.build_service('slides', 'v1')
     
     @retry_on_network_error()
+    def build_simple_presentation(self, slides_data: list, title: str = "New Presentation", settings: dict = None) -> Dict[str, Any]:
+        """
+        Build new presentation with advanced formatting options.
+        Supports custom fonts, text positioning, images, tables, and arrows.
+        
+        Args:
+            slides_data: List of slides with 'title', 'mainText', and optional advanced features
+            title: Presentation title
+            settings: Presentation-level settings (orientation, default font, etc.)
+            
+        Returns:
+            Dictionary with presentation_id and presentation_url
+        """
+        try:
+            self._ensure_service()
+            
+            # Parse settings
+            if settings is None:
+                settings = {}
+            
+            page_orientation = settings.get('pageOrientation', 'horizontal')
+            
+            # Define page size based on orientation
+            if page_orientation == 'vertical':
+                page_size = {
+                    'width': {'magnitude': 5143500, 'unit': 'EMU'},
+                    'height': {'magnitude': 9144000, 'unit': 'EMU'}
+                }
+            else:
+                page_size = {
+                    'width': {'magnitude': 9144000, 'unit': 'EMU'},
+                    'height': {'magnitude': 5143500, 'unit': 'EMU'}
+                }
+            
+            # Create blank presentation with custom page size
+            presentation = self.slides_service.presentations().create(
+                body={
+                    'title': title,
+                    'pageSize': page_size
+                }
+            ).execute()
+            
+            presentation_id = presentation['presentationId']
+            
+            logger.info(
+                f"Created presentation: {title} ({page_orientation})",
+                operation="build_simple_presentation",
+                presentation_id=presentation_id
+            )
+            
+            # Get the created presentation to get actual slide IDs
+            presentation = self.slides_service.presentations().get(
+                presentationId=presentation_id
+            ).execute()
+            
+            # Create additional slides if needed
+            requests = []
+            slide_count = len(slides_data)
+            
+            for idx in range(1, slide_count):
+                requests.append({
+                    'createSlide': {
+                        'insertionIndex': idx
+                    }
+                })
+            
+            # Execute slide creation first
+            if requests:
+                self.slides_service.presentations().batchUpdate(
+                    presentationId=presentation_id,
+                    body={'requests': requests}
+                ).execute()
+                
+                # Refresh presentation to get new slide IDs
+                presentation = self.slides_service.presentations().get(
+                    presentationId=presentation_id
+                ).execute()
+            
+            # Now add content to each slide
+            requests = []
+            actual_slides = presentation.get('slides', [])
+            
+            for idx, slide_data in enumerate(slides_data):
+                if idx < len(actual_slides):
+                    actual_slide_id = actual_slides[idx]['objectId']
+                    
+                    # Delete default layout elements (title/body placeholders)
+                    slide = actual_slides[idx]
+                    for element in slide.get('pageElements', []):
+                        requests.append({
+                            'deleteObject': {
+                                'objectId': element['objectId']
+                            }
+                        })
+            
+            # Execute deletions
+            if requests:
+                self.slides_service.presentations().batchUpdate(
+                    presentationId=presentation_id,
+                    body={'requests': requests}
+                ).execute()
+                requests = []
+            
+            # Add content with advanced features
+            for idx, slide_data in enumerate(slides_data):
+                if idx < len(actual_slides):
+                    actual_slide_id = actual_slides[idx]['objectId']
+                    slide_requests = self._build_advanced_slide_content(
+                        slide_data, actual_slide_id, idx, settings
+                    )
+                    requests.extend(slide_requests)
+            
+            # Apply all content updates in batch
+            if requests:
+                # Split into batches if too large (max 500 requests per batch)
+                batch_size = 500
+                for i in range(0, len(requests), batch_size):
+                    batch = requests[i:i + batch_size]
+                    self.slides_service.presentations().batchUpdate(
+                        presentationId=presentation_id,
+                        body={'requests': batch}
+                    ).execute()
+            
+            presentation_url = f"https://docs.google.com/presentation/d/{presentation_id}/edit"
+            
+            logger.info(
+                f"Presentation built successfully",
+                operation="build_simple_presentation",
+                presentation_id=presentation_id,
+                url=presentation_url
+            )
+            
+            return {
+                'presentation_id': presentation_id,
+                'presentation_url': presentation_url,
+                'title': title
+            }
+            
+        except Exception as e:
+            logger.error(
+                f"Failed to build presentation: {e}",
+                operation="build_simple_presentation",
+                exc_info=True
+            )
+            raise BuilderError(f"Failed to build presentation: {e}") from e
+    
+    def _build_plain_slide_content(self, slide_data: Dict[str, Any], slide_id: str, index: int) -> list:
+        """
+        Generate batch update requests for PLAIN TEXT slide content.
+        NO formatting, NO colors, NO backgrounds - just raw text.
+        
+        Args:
+            slide_data: Slide with 'title' and 'mainText' fields
+            slide_id: Actual slide ID in the presentation
+            index: Slide index
+            
+        Returns:
+            List of batch update requests
+        """
+        requests = []
+        
+        title = slide_data.get('title', '').strip()
+        main_text = slide_data.get('mainText', '').strip()
+        
+        element_count = 0
+        
+        # Add title if present
+        if title:
+            element_id = f"plain_title_{index}_{element_count}"
+            element_count += 1
+            
+            # Create title text box (top of slide)
+            requests.append({
+                'createShape': {
+                    'objectId': element_id,
+                    'shapeType': 'TEXT_BOX',
+                    'elementProperties': {
+                        'pageObjectId': slide_id,
+                        'size': {
+                            'width': {'magnitude': 8000000, 'unit': 'EMU'},  # ~630 PT
+                            'height': {'magnitude': 1000000, 'unit': 'EMU'}  # ~80 PT
+                        },
+                        'transform': {
+                            'scaleX': 1,
+                            'scaleY': 1,
+                            'translateX': 635000,  # ~50 PT from left
+                            'translateY': 635000,  # ~50 PT from top
+                            'unit': 'EMU'
+                        }
+                    }
+                }
+            })
+            
+            # Insert title text
+            requests.append({
+                'insertText': {
+                    'objectId': element_id,
+                    'text': title,
+                    'insertionIndex': 0
+                }
+            })
+        
+        # Add main text if present
+        if main_text:
+            element_id = f"plain_text_{index}_{element_count}"
+            element_count += 1
+            
+            # Calculate Y position (below title or at top if no title)
+            y_position = 1905000 if title else 635000  # ~150 PT or ~50 PT
+            
+            # Create main text box
+            requests.append({
+                'createShape': {
+                    'objectId': element_id,
+                    'shapeType': 'TEXT_BOX',
+                    'elementProperties': {
+                        'pageObjectId': slide_id,
+                        'size': {
+                            'width': {'magnitude': 8000000, 'unit': 'EMU'},  # ~630 PT
+                            'height': {'magnitude': 4500000, 'unit': 'EMU'}  # ~355 PT
+                        },
+                        'transform': {
+                            'scaleX': 1,
+                            'scaleY': 1,
+                            'translateX': 635000,  # ~50 PT from left
+                            'translateY': y_position,
+                            'unit': 'EMU'
+                        }
+                    }
+                }
+            })
+            
+            # Insert main text
+            requests.append({
+                'insertText': {
+                    'objectId': element_id,
+                    'text': main_text,
+                    'insertionIndex': 0
+                }
+            })
+        
+        return requests
+    
+    @retry_on_network_error()
     def build_presentation(self, designed_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Build new presentation from designed specification.
@@ -493,3 +737,379 @@ class PresentationBuilder:
         g = int(hex_color[2:4], 16) / 255.0
         b = int(hex_color[4:6], 16) / 255.0
         return {'red': r, 'green': g, 'blue': b}
+    
+    def _pt_to_emu(self, pt: float) -> int:
+        """
+        Convert points to EMU (English Metric Units).
+        
+        Args:
+            pt: Value in points
+            
+        Returns:
+            Value in EMU
+        """
+        return int(pt * 12700)
+    
+    def _build_advanced_slide_content(self, slide_data: Dict[str, Any], slide_id: str, index: int, settings: dict) -> list:
+        """
+        Generate batch update requests for slide with plain text content.
+        NO colors, NO backgrounds - just clean text positioning.
+        
+        Args:
+            slide_data: Slide with title, mainText, and optional images/tables/arrows
+            slide_id: Actual slide ID in the presentation
+            index: Slide index
+            settings: Presentation-level settings
+            
+        Returns:
+            List of batch update requests
+        """
+        requests = []
+        
+        title = slide_data.get('title', '').strip()
+        main_text = slide_data.get('mainText', '').strip()
+        font_family = slide_data.get('fontFamily', settings.get('defaultFont', 'Arial'))
+        title_size = slide_data.get('titleSize', 44)
+        text_size = slide_data.get('textSize', 18)
+        
+        # Get text positioning
+        text_position = slide_data.get('textPosition', settings.get('defaultTextPosition', {}))
+        vertical = text_position.get('vertical', 'top')
+        horizontal = text_position.get('horizontal', 'left')
+        
+        # Calculate positions
+        vertical_positions = {'top': 635000, 'center': 3200000, 'bottom': 5715000}
+        horizontal_positions = {'left': 635000, 'center': 1905000, 'right': 3175000}
+        
+        y_title = vertical_positions.get(vertical, 635000)
+        x_pos = horizontal_positions.get(horizontal, 635000)
+        
+        element_count = 0
+        
+        # Add title if present
+        if title:
+            element_id = f"title_{index}_{element_count}"
+            element_count += 1
+            
+            # Create title text box
+            requests.append({
+                'createShape': {
+                    'objectId': element_id,
+                    'shapeType': 'TEXT_BOX',
+                    'elementProperties': {
+                        'pageObjectId': slide_id,
+                        'size': {
+                            'width': {'magnitude': self._pt_to_emu(600), 'unit': 'EMU'},
+                            'height': {'magnitude': self._pt_to_emu(80), 'unit': 'EMU'}
+                        },
+                        'transform': {
+                            'scaleX': 1,
+                            'scaleY': 1,
+                            'translateX': x_pos,
+                            'translateY': y_title,
+                            'unit': 'EMU'
+                        }
+                    }
+                }
+            })
+            
+            # Insert title text
+            requests.append({
+                'insertText': {
+                    'objectId': element_id,
+                    'text': title,
+                    'insertionIndex': 0
+                }
+            })
+            
+            # Apply ONLY font family and size - NO colors, NO bold
+            requests.append({
+                'updateTextStyle': {
+                    'objectId': element_id,
+                    'textRange': {'type': 'ALL'},
+                    'style': {
+                        'fontSize': {'magnitude': title_size, 'unit': 'PT'},
+                        'fontFamily': font_family
+                    },
+                    'fields': 'fontSize,fontFamily'
+                }
+            })
+            
+            # Apply alignment
+            alignment = 'START' if horizontal == 'left' else ('CENTER' if horizontal == 'center' else 'END')
+            requests.append({
+                'updateParagraphStyle': {
+                    'objectId': element_id,
+                    'textRange': {'type': 'ALL'},
+                    'style': {'alignment': alignment},
+                    'fields': 'alignment'
+                }
+            })
+        
+        # Add main text if present
+        if main_text:
+            element_id = f"text_{index}_{element_count}"
+            element_count += 1
+            
+            # Calculate Y position (below title or at position if no title)
+            y_text = y_title + self._pt_to_emu(100) if title else y_title
+            
+            # Create main text box
+            requests.append({
+                'createShape': {
+                    'objectId': element_id,
+                    'shapeType': 'TEXT_BOX',
+                    'elementProperties': {
+                        'pageObjectId': slide_id,
+                        'size': {
+                            'width': {'magnitude': self._pt_to_emu(600), 'unit': 'EMU'},
+                            'height': {'magnitude': self._pt_to_emu(300), 'unit': 'EMU'}
+                        },
+                        'transform': {
+                            'scaleX': 1,
+                            'scaleY': 1,
+                            'translateX': x_pos,
+                            'translateY': y_text,
+                            'unit': 'EMU'
+                        }
+                    }
+                }
+            })
+            
+            # Insert main text
+            requests.append({
+                'insertText': {
+                    'objectId': element_id,
+                    'text': main_text,
+                    'insertionIndex': 0
+                }
+            })
+            
+            # Apply ONLY font family and size - NO colors
+            requests.append({
+                'updateTextStyle': {
+                    'objectId': element_id,
+                    'textRange': {'type': 'ALL'},
+                    'style': {
+                        'fontSize': {'magnitude': text_size, 'unit': 'PT'},
+                        'fontFamily': font_family
+                    },
+                    'fields': 'fontSize,fontFamily'
+                }
+            })
+            
+            # Apply alignment
+            alignment = 'START' if horizontal == 'left' else ('CENTER' if horizontal == 'center' else 'END')
+            requests.append({
+                'updateParagraphStyle': {
+                    'objectId': element_id,
+                    'textRange': {'type': 'ALL'},
+                    'style': {'alignment': alignment},
+                    'fields': 'alignment'
+                }
+            })
+        
+        # Separate images by layer
+        all_images = slide_data.get('images', [])
+        background_images = [img for img in all_images if img.get('layer') != 'foreground']
+        foreground_images = [img for img in all_images if img.get('layer') == 'foreground']
+        
+        # Add background images first (behind text)
+        for img_idx, image in enumerate(background_images):
+            requests.extend(self._add_image(slide_id, image, f"bg_{img_idx}"))
+        
+        # Text is already added above, so foreground images come after
+        # Add foreground images last (in front of text)
+        for img_idx, image in enumerate(foreground_images):
+            requests.extend(self._add_image(slide_id, image, f"fg_{img_idx}"))
+        
+        # Add tables
+        for tbl_idx, table in enumerate(slide_data.get('tables', [])):
+            requests.extend(self._add_table(slide_id, table, tbl_idx))
+        
+        # Add arrows
+        for arr_idx, arrow in enumerate(slide_data.get('arrows', [])):
+            requests.extend(self._add_arrow(slide_id, arrow, arr_idx))
+        
+        return requests
+    
+    def _add_image(self, slide_id: str, image_data: dict, index) -> list:
+        """
+        Generate batch requests for image insertion.
+        
+        Args:
+            slide_id: Target slide object ID
+            image_data: {url, position, size, layer}
+            index: Image index for unique ID generation (can be int or str)
+            
+        Returns:
+            List of batch update requests
+        """
+        requests = []
+        
+        image_id = f"img_{slide_id}_{index}"
+        url = image_data.get('url')
+        position = image_data.get('position', {'x': 100, 'y': 100})
+        size = image_data.get('size', {'width': 200, 'height': 150})
+        
+        if not url:
+            return requests
+        
+        requests.append({
+            'createImage': {
+                'objectId': image_id,
+                'url': url,
+                'elementProperties': {
+                    'pageObjectId': slide_id,
+                    'size': {
+                        'width': {'magnitude': self._pt_to_emu(size['width']), 'unit': 'EMU'},
+                        'height': {'magnitude': self._pt_to_emu(size['height']), 'unit': 'EMU'}
+                    },
+                    'transform': {
+                        'scaleX': 1,
+                        'scaleY': 1,
+                        'translateX': self._pt_to_emu(position['x']),
+                        'translateY': self._pt_to_emu(position['y']),
+                        'unit': 'EMU'
+                    }
+                }
+            }
+        })
+        
+        return requests
+    
+    def _add_table(self, slide_id: str, table_data: dict, index: int) -> list:
+        """
+        Generate batch requests for table creation.
+        
+        Args:
+            slide_id: Target slide object ID
+            table_data: {rows, columns, position, size, cellData}
+            index: Table index for unique ID generation
+            
+        Returns:
+            List of batch update requests
+        """
+        requests = []
+        
+        table_id = f"tbl_{slide_id}_{index}"
+        rows = table_data.get('rows', 3)
+        columns = table_data.get('columns', 3)
+        position = table_data.get('position', {'x': 50, 'y': 200})
+        size = table_data.get('size', {'width': 500, 'height': 200})
+        cell_data = table_data.get('cellData', {})
+        
+        requests.append({
+            'createTable': {
+                'objectId': table_id,
+                'rows': rows,
+                'columns': columns,
+                'elementProperties': {
+                    'pageObjectId': slide_id,
+                    'size': {
+                        'width': {'magnitude': self._pt_to_emu(size['width']), 'unit': 'EMU'},
+                        'height': {'magnitude': self._pt_to_emu(size['height']), 'unit': 'EMU'}
+                    },
+                    'transform': {
+                        'scaleX': 1,
+                        'scaleY': 1,
+                        'translateX': self._pt_to_emu(position['x']),
+                        'translateY': self._pt_to_emu(position['y']),
+                        'unit': 'EMU'
+                    }
+                }
+            }
+        })
+        
+        # Add cell text if provided
+        for cell_key, cell_text in cell_data.items():
+            if '_' in cell_key:
+                row_idx, col_idx = map(int, cell_key.split('_'))
+                requests.append({
+                    'insertText': {
+                        'objectId': table_id,
+                        'text': cell_text,
+                        'cellLocation': {
+                            'rowIndex': row_idx,
+                            'columnIndex': col_idx
+                        }
+                    }
+                })
+        
+        return requests
+    
+    def _add_arrow(self, slide_id: str, arrow_data: dict, index: int) -> list:
+        """
+        Generate batch requests for arrow/connector shape.
+        
+        Args:
+            slide_id: Target slide object ID
+            arrow_data: {type, startPoint, endPoint, color, strokeWidth}
+            index: Arrow index for unique ID generation
+            
+        Returns:
+            List of batch update requests
+        """
+        requests = []
+        
+        arrow_id = f"arr_{slide_id}_{index}"
+        arrow_type = arrow_data.get('type', 'straight')
+        start_point = arrow_data.get('startPoint', {'x': 100, 'y': 150})
+        end_point = arrow_data.get('endPoint', {'x': 300, 'y': 150})
+        color = arrow_data.get('color', '#000000')
+        stroke_width = arrow_data.get('strokeWidth', 2)
+        
+        # Map arrow type to Google Slides shape type
+        shape_type_map = {
+            'straight': 'STRAIGHT_CONNECTOR_1',
+            'bent': 'BENT_CONNECTOR_2',
+            'curved': 'CURVED_CONNECTOR_3'
+        }
+        shape_type = shape_type_map.get(arrow_type, 'STRAIGHT_CONNECTOR_1')
+        
+        # Calculate length and position
+        width = end_point['x'] - start_point['x']
+        height = end_point['y'] - start_point['y']
+        
+        requests.append({
+            'createShape': {
+                'objectId': arrow_id,
+                'shapeType': shape_type,
+                'elementProperties': {
+                    'pageObjectId': slide_id,
+                    'size': {
+                        'width': {'magnitude': self._pt_to_emu(abs(width)), 'unit': 'EMU'},
+                        'height': {'magnitude': self._pt_to_emu(abs(height)), 'unit': 'EMU'}
+                    },
+                    'transform': {
+                        'scaleX': 1 if width >= 0 else -1,
+                        'scaleY': 1 if height >= 0 else -1,
+                        'translateX': self._pt_to_emu(start_point['x']),
+                        'translateY': self._pt_to_emu(start_point['y']),
+                        'unit': 'EMU'
+                    }
+                }
+            }
+        })
+        
+        # Apply arrow styling
+        requests.append({
+            'updateShapeProperties': {
+                'objectId': arrow_id,
+                'shapeProperties': {
+                    'outline': {
+                        'outlineFill': {
+                            'solidFill': {
+                                'color': {
+                                    'rgbColor': self._hex_to_rgb(color)
+                                }
+                            }
+                        },
+                        'weight': {'magnitude': stroke_width, 'unit': 'PT'}
+                    }
+                },
+                'fields': 'outline'
+            }
+        })
+        
+        return requests

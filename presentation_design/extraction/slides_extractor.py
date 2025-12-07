@@ -77,12 +77,14 @@ class SlidesExtractor:
         raise ExtractionError(f"Invalid Google Slides URL format: {url}")
     
     @retry_on_network_error()
-    def extract_presentation(self, presentation_url: str) -> Dict[str, Any]:
+    def extract_presentation(self, presentation_url: str, raw_mode: bool = False) -> Dict[str, Any]:
         """
         Extract complete presentation content.
         
         Args:
             presentation_url: Google Slides URL or presentation ID
+            raw_mode: If True, extract raw text without structural analysis.
+                     If False, apply full content parsing with TextSplitter.
             
         Returns:
             Parsed presentation data with structure and content
@@ -95,7 +97,7 @@ class SlidesExtractor:
             presentation_id = self.extract_presentation_id(presentation_url)
             
             logger.info(
-                f"Extracting presentation {presentation_id}",
+                f"Extracting presentation {presentation_id} (raw_mode={raw_mode})",
                 operation="extract_presentation",
                 presentation_id=presentation_id
             )
@@ -115,8 +117,28 @@ class SlidesExtractor:
                 slide_count=len(presentation_data.get('slides', []))
             )
             
-            # Parse presentation structure
-            parsed_data = ContentParser.parse_presentation(presentation_data)
+            # Parse presentation based on mode
+            if raw_mode:
+                # Raw extraction: preserve original text without analysis
+                parsed_data = {
+                    'presentation_id': presentation_data.get('presentationId'),
+                    'title': presentation_data.get('title'),
+                    'slides': []
+                }
+                
+                slides = presentation_data.get('slides', [])
+                for idx, slide in enumerate(slides):
+                    raw_slide = ContentParser.extract_raw_slide_elements(slide, idx)
+                    parsed_data['slides'].append(raw_slide)
+                
+                logger.info(
+                    f"Raw extraction completed with {len(parsed_data['slides'])} slides",
+                    operation="extract_presentation",
+                    presentation_id=presentation_id
+                )
+            else:
+                # Structured extraction: full content analysis
+                parsed_data = ContentParser.parse_presentation(presentation_data)
             
             return parsed_data
             
