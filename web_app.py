@@ -741,10 +741,15 @@ def history():
 
 
 if __name__ == '__main__':
+    # Initialize database on startup
+    init_database()
+    
     print("="*60)
     print("Presentation Design System - Web Interface")
     print("="*60)
     print("\nStarting server at http://localhost:5000")
     print("\nPress Ctrl+C to stop\n")
     
-    app.run(debug=True, port=5000, host='0.0.0.0')
+    # Use debug mode only for local development
+    debug_mode = os.environ.get('FLASK_ENV') == 'development'
+    app.run(debug=debug_mode, port=5000, host='0.0.0.0')

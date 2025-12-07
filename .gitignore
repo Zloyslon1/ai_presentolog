@@ -58,3 +58,32 @@ Thumbs.db
 
 # Python virtual environment
 venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# Google API credentials
+credentials/token.json
+credentials/client_secret.json
+
+# SQLite databases
+*.db
+*.db-journal
+
+# Environment variables
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Debug files
+debug*.html
