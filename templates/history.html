@@ -4,7 +4,15 @@
 
 {% block content %}
 <div class="max-w-6xl mx-auto">
-    <h1 class="text-3xl font-bold text-gray-900 mb-8">История обработки</h1>
+    <div class="flex justify-between items-center mb-8">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-900">Мои обработки</h1>
+            <p class="text-gray-600 mt-1">Всего: {{ total }} обработок</p>
+        </div>
+        <a href="/" class="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg font-medium hover:from-purple-600 hover:to-pink-600">
+            + Новая презентация
+        </a>
+    </div>
     
     {% if jobs %}
     <div class="bg-white rounded-lg shadow overflow-hidden">
@@ -15,13 +23,13 @@
                         ID
                     </th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Источник
+                    </th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Статус
                     </th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Шаблон
-                    </th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Создан
+                        Создано
                     </th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Действия
@@ -34,33 +42,60 @@
                     <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900">
                         {{ job.id }}
                     </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                        {% if job.presentation_url %}
+                        <a href="{{ job.presentation_url }}" target="_blank" class="text-blue-600 hover:underline truncate block max-w-xs" title="{{ job.presentation_url }}">
+                            {{ job.presentation_url[:50] }}{% if job.presentation_url|length > 50 %}...{% endif %}
+                        </a>
+                        {% else %}
+                        <span class="text-gray-400">—</span>
+                        {% endif %}
+                    </td>
                     <td class="px-6 py-4 whitespace-nowrap">
                         {% if job.status == 'completed' %}
                         <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
                             ✓ Готово
                         </span>
+                        {% elif job.status == 'extracted' %}
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                            📝 В редакторе
+                        </span>
                         {% elif job.status == 'error' %}
                         <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
                             ✗ Ошибка
                         </span>
-                        {% else %}
+                        {% elif job.status == 'editing' %}
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800">
+                            ✏️ Редактируется
+                        </span>
+                        {% elif job.status == 'extracting' %}
                         <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                            ⏳ Обработка
+                            ⏳ Извлечение...
+                        </span>
+                        {% elif job.status == 'processing' %}
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                            ⏳ Обработка...
+                        </span>
+                        {% else %}
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                            {{ job.status }}
                         </span>
                         {% endif %}
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {{ job.template }}
-                    </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {{ job.created_at[:19] }}
+                        {{ job.created_at[:19] if job.created_at else '—' }}
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <a href="/job/{{ job.id }}" class="text-blue-600 hover:text-blue-900 mr-4">
-                            Подробнее
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-3">
+                        {% if job.status in ['extracted', 'editing', 'completed'] and job.has_slides %}
+                        <a href="/slide_editor?job_id={{ job.id }}" class="text-purple-600 hover:text-purple-900">
+                            ✏️ Редактор
                         </a>
-                        {% if job.status == 'completed' and job.result %}
-                        <a href="{{ job.result.presentation_url }}" target="_blank" class="text-green-600 hover:text-green-900">
+                        {% endif %}
+                        <a href="/job/{{ job.id }}" class="text-blue-600 hover:text-blue-900">
+                            Детали
+                        </a>
+                        {% if job.status == 'completed' and job.generated_presentation_id %}
+                        <a href="https://docs.google.com/presentation/d/{{ job.generated_presentation_id }}/edit" target="_blank" class="text-green-600 hover:text-green-900">
                             Открыть →
                         </a>
                         {% endif %}
@@ -70,10 +105,32 @@
             </tbody>
         </table>
     </div>
+    
+    <!-- Pagination -->
+    {% if total_pages > 1 %}
+    <div class="mt-6 flex justify-center space-x-2">
+        {% if has_prev %}
+        <a href="?page={{ page - 1 }}" class="px-4 py-2 bg-white border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">
+            ← Предыдущая
+        </a>
+        {% endif %}
+        
+        <span class="px-4 py-2 text-gray-600">
+            Страница {{ page }} из {{ total_pages }}
+        </span>
+        
+        {% if has_next %}
+        <a href="?page={{ page + 1 }}" class="px-4 py-2 bg-white border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">
+            Следующая →
+        </a>
+        {% endif %}
+    </div>
+    {% endif %}
+    
     {% else %}
-    <div class="text-center py-12">
+    <div class="text-center py-12 bg-white rounded-lg shadow">
         <div class="text-6xl mb-4">📊</div>
-        <h2 class="text-xl font-semibold text-gray-900 mb-2">Пока нет обработанных презентаций</h2>
+        <h2 class="text-xl font-semibold text-gray-900 mb-2">У вас пока нет обработанных презентаций</h2>
         <p class="text-gray-600 mb-6">Начните с главной страницы</p>
         <a href="/" class="inline-block px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg font-medium hover:from-purple-600 hover:to-pink-600">
             Создать презентацию

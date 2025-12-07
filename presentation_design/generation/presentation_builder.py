@@ -758,6 +758,46 @@ class PresentationBuilder:
         """
         return int(pt * 12700)
     
+    def _html_to_plain_text(self, html_text: str) -> str:
+        """
+        Convert HTML from contenteditable to plain text.
+        Removes HTML tags while preserving text content and line breaks.
+        
+        Args:
+            html_text: HTML string from contenteditable editor
+            
+        Returns:
+            Plain text without HTML tags
+        """
+        import re
+        from html import unescape
+        
+        # Replace <br> and </div><div> with newlines before removing tags
+        text = re.sub(r'<br\s*/?>', '\n', html_text)
+        text = re.sub(r'</div><div>', '\n', text)
+        text = re.sub(r'</p><p>', '\n\n', text)
+        
+        # Convert list items to bullet points (handle </li> before <li>)
+        text = re.sub(r'</li>\s*<li[^>]*>', '\n• ', text)  # Between items
+        text = re.sub(r'<li[^>]*>', '• ', text)  # First item
+        text = re.sub(r'</li>', '', text)  # Remove closing tags
+        
+        # Remove all remaining HTML tags
+        text = re.sub(r'<[^>]+>', '', text)
+        
+        # Decode HTML entities
+        text = unescape(text)
+        
+        # Clean up multiple newlines and spaces
+        text = re.sub(r'\n\s*\n\s*\n+', '\n\n', text)  # Max 2 newlines
+        text = re.sub(r' +', ' ', text)  # Multiple spaces to single
+        
+        # Remove leading/trailing whitespace from each line
+        lines = [line.strip() for line in text.split('\n')]
+        text = '\n'.join(lines)
+        
+        return text.strip()
+    
     def _build_advanced_slide_content(self, slide_data: Dict[str, Any], slide_id: str, index: int, settings: dict) -> list:
         """
         Generate batch update requests for slide with plain text content.
@@ -774,11 +814,40 @@ class PresentationBuilder:
         """
         requests = []
         
+        # Apply background if specified
+        background = slide_data.get('background', {})
+        bg_type = background.get('type', 'none')
+        
+        if bg_type == 'solid' or bg_type == 'gradient':
+            # Use solid color for both solid and gradient (Google Slides doesn't support gradients)
+            color = background.get('color', '#FFFFFF')
+            requests.append({
+                'updatePageProperties': {
+                    'objectId': slide_id,
+                    'pageProperties': {
+                        'pageBackgroundFill': {
+                            'solidFill': {
+                                'color': {
+                                    'rgbColor': self._hex_to_rgb(color)
+                                }
+                            }
+                        }
+                    },
+                    'fields': 'pageBackgroundFill'
+                }
+            })
+        
         title = slide_data.get('title', '').strip()
         main_text = slide_data.get('mainText', '').strip()
+        
+        # Parse HTML from contenteditable if present
+        if main_text and ('<' in main_text):
+            main_text = self._html_to_plain_text(main_text)
+        
         font_family = slide_data.get('fontFamily', settings.get('defaultFont', 'Arial'))
         title_size = slide_data.get('titleSize', 44)
         text_size = slide_data.get('textSize', 18)
+        text_color = slide_data.get('textColor', '#000000')
         
         # Get text positioning
         text_position = slide_data.get('textPosition', settings.get('defaultTextPosition', {}))
@@ -837,9 +906,14 @@ class PresentationBuilder:
                     'textRange': {'type': 'ALL'},
                     'style': {
                         'fontSize': {'magnitude': title_size, 'unit': 'PT'},
-                        'fontFamily': font_family
+                        'fontFamily': font_family,
+                        'foregroundColor': {
+                            'opaqueColor': {
+                                'rgbColor': self._hex_to_rgb(text_color)
+                            }
+                        }
                     },
-                    'fields': 'fontSize,fontFamily'
+                    'fields': 'fontSize,fontFamily,foregroundColor'
                 }
             })
             
@@ -851,6 +925,23 @@ class PresentationBuilder:
                     'textRange': {'type': 'ALL'},
                     'style': {'alignment': alignment},
                     'fields': 'alignment'
+                }
+            })
+            
+            # Apply vertical alignment via contentAlignment
+            vertical_alignment_map = {
+                'top': 'TOP',
+                'center': 'MIDDLE',
+                'bottom': 'BOTTOM'
+            }
+            content_alignment = vertical_alignment_map.get(vertical, 'TOP')
+            requests.append({
+                'updateShapeProperties': {
+                    'objectId': element_id,
+                    'shapeProperties': {
+                        'contentAlignment': content_alignment
+                    },
+                    'fields': 'contentAlignment'
                 }
             })
         
@@ -900,9 +991,14 @@ class PresentationBuilder:
                     'textRange': {'type': 'ALL'},
                     'style': {
                         'fontSize': {'magnitude': text_size, 'unit': 'PT'},
-                        'fontFamily': font_family
+                        'fontFamily': font_family,
+                        'foregroundColor': {
+                            'opaqueColor': {
+                                'rgbColor': self._hex_to_rgb(text_color)
+                            }
+                        }
                     },
-                    'fields': 'fontSize,fontFamily'
+                    'fields': 'fontSize,fontFamily,foregroundColor'
                 }
             })
             
@@ -914,6 +1010,23 @@ class PresentationBuilder:
                     'textRange': {'type': 'ALL'},
                     'style': {'alignment': alignment},
                     'fields': 'alignment'
+                }
+            })
+            
+            # Apply vertical alignment via contentAlignment
+            vertical_alignment_map = {
+                'top': 'TOP',
+                'center': 'MIDDLE',
+                'bottom': 'BOTTOM'
+            }
+            content_alignment = vertical_alignment_map.get(vertical, 'TOP')
+            requests.append({
+                'updateShapeProperties': {
+                    'objectId': element_id,
+                    'shapeProperties': {
+                        'contentAlignment': content_alignment
+                    },
+                    'fields': 'contentAlignment'
                 }
             })
         
@@ -938,6 +1051,10 @@ class PresentationBuilder:
         # Add arrows
         for arr_idx, arrow in enumerate(slide_data.get('arrows', [])):
             requests.extend(self._add_arrow(slide_id, arrow, arr_idx))
+        
+        # Add accent boxes
+        for box_idx, box in enumerate(slide_data.get('accentBoxes', [])):
+            requests.extend(self._add_accent_box(slide_id, box, box_idx))
         
         return requests
     
@@ -1233,5 +1350,113 @@ class PresentationBuilder:
                 'fields': 'outline'
             }
         })
+        
+        return requests
+    
+    def _add_accent_box(self, slide_id: str, box_data: dict, index: int) -> list:
+        """
+        Generate batch requests for accent box (highlighted rectangle with text).
+        
+        Args:
+            slide_id: Target slide object ID
+            box_data: {text, position, size, backgroundColor, borderColor, borderWidth, textColor, fontSize}
+            index: Box index for unique ID generation
+            
+        Returns:
+            List of batch update requests
+        """
+        requests = []
+        
+        box_id = f"accent_{slide_id}_{index}"
+        text = box_data.get('text', '')
+        position = box_data.get('position', {'x': 50, 'y': 200})
+        size = box_data.get('size', {'width': 300, 'height': 100})
+        bg_color = box_data.get('backgroundColor', '#E0E7FF')
+        border_color = box_data.get('borderColor', '#4F46E5')
+        border_width = box_data.get('borderWidth', 2)
+        text_color = box_data.get('textColor', '#1E1B4B')
+        font_size = box_data.get('fontSize', 14)
+        
+        # Create rounded rectangle shape
+        requests.append({
+            'createShape': {
+                'objectId': box_id,
+                'shapeType': 'ROUND_RECTANGLE',
+                'elementProperties': {
+                    'pageObjectId': slide_id,
+                    'size': {
+                        'width': {'magnitude': self._pt_to_emu(size['width']), 'unit': 'EMU'},
+                        'height': {'magnitude': self._pt_to_emu(size['height']), 'unit': 'EMU'}
+                    },
+                    'transform': {
+                        'scaleX': 1,
+                        'scaleY': 1,
+                        'translateX': self._pt_to_emu(position['x']),
+                        'translateY': self._pt_to_emu(position['y']),
+                        'unit': 'EMU'
+                    }
+                }
+            }
+        })
+        
+        # Apply background and border styling
+        requests.append({
+            'updateShapeProperties': {
+                'objectId': box_id,
+                'shapeProperties': {
+                    'shapeBackgroundFill': {
+                        'solidFill': {
+                            'color': {'rgbColor': self._hex_to_rgb(bg_color)}
+                        }
+                    },
+                    'outline': {
+                        'outlineFill': {
+                            'solidFill': {
+                                'color': {'rgbColor': self._hex_to_rgb(border_color)}
+                            }
+                        },
+                        'weight': {'magnitude': border_width, 'unit': 'PT'}
+                    }
+                },
+                'fields': 'shapeBackgroundFill,outline'
+            }
+        })
+        
+        # Add text content if provided
+        if text:
+            requests.append({
+                'insertText': {
+                    'objectId': box_id,
+                    'text': text,
+                    'insertionIndex': 0
+                }
+            })
+            
+            # Style the text
+            requests.append({
+                'updateTextStyle': {
+                    'objectId': box_id,
+                    'textRange': {'type': 'ALL'},
+                    'style': {
+                        'fontSize': {'magnitude': font_size, 'unit': 'PT'},
+                        'foregroundColor': {
+                            'opaqueColor': {
+                                'rgbColor': self._hex_to_rgb(text_color)
+                            }
+                        }
+                    },
+                    'fields': 'fontSize,foregroundColor'
+                }
+            })
+            
+            # Center align text in box
+            requests.append({
+                'updateParagraphStyle': {
+                    'objectId': box_id,
+                    'textRange': {'type': 'ALL'},
+                    'style': {'alignment': 'CENTER'},
+                    'fields': 'alignment'
+                }
+            })
         
         return requests

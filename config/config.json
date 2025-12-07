@@ -4,7 +4,8 @@
     "token_path": "credentials/token.json",
     "scopes": [
       "https://www.googleapis.com/auth/presentations",
-      "https://www.googleapis.com/auth/drive.file"
+      "https://www.googleapis.com/auth/presentations.readonly",
+      "https://www.googleapis.com/auth/drive.readonly"
     ]
   },
   "templates": {

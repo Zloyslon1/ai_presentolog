@@ -29,15 +29,28 @@
                     🎨 Presentation Design
                 </span>
             </a>
-            <div class="hidden w-full md:block md:w-auto">
-                <ul class="font-medium flex flex-col p-4 md:p-0 mt-4 md:flex-row md:space-x-8 md:mt-0">
-                    <li>
-                        <a href="/" class="block py-2 pl-3 pr-4 text-white rounded md:p-0 hover:text-gray-200">Home</a>
-                    </li>
-                    <li>
-                        <a href="/history" class="block py-2 pl-3 pr-4 text-white rounded md:p-0 hover:text-gray-200">History</a>
-                    </li>
-                </ul>
+            <div class="flex items-center space-x-4">
+                <div class="hidden w-full md:block md:w-auto">
+                    <ul class="font-medium flex flex-col p-4 md:p-0 mt-4 md:flex-row md:space-x-8 md:mt-0">
+                        <li>
+                            <a href="/" class="block py-2 pl-3 pr-4 text-white rounded md:p-0 hover:text-gray-200">Home</a>
+                        </li>
+                        <li>
+                            <a href="/history" class="block py-2 pl-3 pr-4 text-white rounded md:p-0 hover:text-gray-200">History</a>
+                        </li>
+                    </ul>
+                </div>
+                {% if user_email %}
+                <div class="flex items-center space-x-3">
+                    <span class="text-white text-sm bg-white bg-opacity-20 px-3 py-1.5 rounded-full">
+                        👤 {{ user_email }}
+                    </span>
+                    <a href="/logout" 
+                       class="text-white bg-white bg-opacity-20 hover:bg-opacity-30 px-4 py-2 rounded-lg text-sm font-medium transition">
+                        Logout
+                    </a>
+                </div>
+                {% endif %}
             </div>
         </div>
     </nav>

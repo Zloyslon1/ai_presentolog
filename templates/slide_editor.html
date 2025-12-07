@@ -4,11 +4,72 @@
 
 {% block content %}
 <style>
+/* Editable content styles */
+#editableContent {
+    min-height: 100%;
+    color: #111827;
+}
+
+#editableContent:empty:before {
+    content: attr(placeholder);
+    color: #9CA3AF;
+    pointer-events: none;
+}
+
+#editableContent h1 {
+    font-size: 2.5rem;
+    font-weight: 700;
+    line-height: 1.2;
+    margin-bottom: 1rem;
+    color: #111827;
+}
+
+#editableContent h2 {
+    font-size: 2rem;
+    font-weight: 600;
+    line-height: 1.3;
+    margin-bottom: 0.75rem;
+    color: #111827;
+}
+
+#editableContent h3 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    line-height: 1.4;
+    margin-bottom: 0.5rem;
+    color: #111827;
+}
+
+#editableContent h4 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    line-height: 1.4;
+    margin-bottom: 0.5rem;
+    color: #111827;
+}
+
+#editableContent p {
+    font-size: 1.125rem;
+    line-height: 1.6;
+    margin-bottom: 0.75rem;
+    color: #374151;
+}
+
+#editableContent ul, #editableContent ol {
+    margin-left: 1.5rem;
+    margin-bottom: 0.75rem;
+}
+
+#editableContent li {
+    margin-bottom: 0.25rem;
+}
+
 /* Image Selection and Manipulation Styles */
 .image-wrapper {
     position: absolute;
     cursor: pointer;
-    pointer-events: auto !important; /* CRITICAL: Allow clicks on wrapper */
+    pointer-events: auto !important; /* CRITICAL: Allow clicks on wrapper regardless of parent */
+    z-index: 1; /* Ensure proper stacking within layer */
 }
 
 .image-wrapper.selected {
@@ -87,11 +148,43 @@
     cursor: ew-resize;
 }
 
+/* Rotation Handle */
+.rotate-handle {
+    position: absolute;
+    top: -30px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 20px;
+    height: 20px;
+    background: white;
+    border: 2px solid #10B981;
+    border-radius: 50%;
+    cursor: grab;
+    z-index: 11;
+    pointer-events: auto;
+    display: none;
+}
+
+.rotate-handle:active {
+    cursor: grabbing;
+}
+
+.rotate-handle::after {
+    content: '↻';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 12px;
+    color: #10B981;
+}
+
 .resize-handle {
     display: none;
 }
 
-.image-wrapper.selected .resize-handle {
+.image-wrapper.selected .resize-handle,
+.image-wrapper.selected .rotate-handle {
     display: block;
 }
 
@@ -143,8 +236,61 @@
 .image-wrapper.selected .aspect-lock-indicator {
     display: flex;
 }
+
+/* Full-screen layout styles */
+.fullscreen-container {
+    width: 100%;
+    max-width: 100vw;
+    padding: 0 1rem;
+}
+
+.editor-grid {
+    display: grid;
+    grid-template-columns: 280px 1fr 280px;
+    gap: 1.5rem;
+    max-height: calc(100vh - 10rem);
+}
+
+@media (max-width: 1440px) {
+    .editor-grid {
+        grid-template-columns: 240px 1fr 240px;
+    }
+}
+
+@media (max-width: 1024px) {
+    .editor-grid {
+        grid-template-columns: 200px 1fr 200px;
+        gap: 1rem;
+    }
+}
+
+.sidebar-panel {
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar-panel > div {
+    flex: 1;
+}
+
+.slides-list-panel {
+    max-height: calc(100vh - 12rem);
+    overflow-y: auto;
+}
+
+.center-panel {
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - 12rem);
+    overflow-y: auto;
+}
+
+.preview-container {
+    width: 100%;
+    max-height: 60vh;
+}
 </style>
-<div class="mx-auto px-4">
+<div class="fullscreen-container">
     <div class="mb-6 flex justify-between items-center">
         <h1 class="text-3xl font-bold text-gray-900">Редактор слайдов</h1>
         <div class="flex gap-3 items-center">
@@ -172,10 +318,10 @@
         <p id="progressText" class="text-sm text-gray-600 mt-2 text-center">Обработка...</p>
     </div>
 
-    <div class="grid grid-cols-12 gap-6">
+    <div class="editor-grid">
         <!-- Slides List (Left Panel) -->
-        <div class="col-span-2">
-            <div class="bg-white rounded-lg shadow p-4">
+        <div class="sidebar-panel slides-list-panel">
+            <div class="bg-white rounded-lg shadow p-4 h-full">
                 <div class="flex justify-between items-center mb-4">
                     <h2 class="text-lg font-bold">Слайды</h2>
                     <button onclick="addNewSlide()" class="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600">
@@ -189,8 +335,8 @@
         </div>
 
         <!-- Slide Editor (Center Panel) -->
-        <div class="col-span-8">
-            <div class="bg-white rounded-lg shadow p-8 lg:p-10">
+        <div class="center-panel">
+            <div class="bg-white rounded-lg shadow p-8 lg:p-10 flex-1">
                 <div class="mb-4 flex justify-between items-center">
                     <h2 class="text-lg font-bold">Слайд <span id="currentSlideNumber">1</span></h2>
                     <button onclick="deleteCurrentSlide()" class="px-3 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600">
@@ -198,99 +344,61 @@
                     </button>
                 </div>
 
-                <!-- Slide Preview -->
-                <div id="slidePreview" class="mb-6 border-2 border-gray-300 rounded-lg bg-white relative" style="aspect-ratio: 16/9; overflow: visible;">
-                    <div id="previewImagesBackground" class="absolute inset-0" style="z-index: 10; pointer-events: none;"></div>
-                    <div class="absolute inset-0 p-8 flex flex-col" style="z-index: 2; pointer-events: none;">
-                        <div id="previewTitle" class="text-gray-900 text-3xl font-bold mb-4"></div>
-                        <div id="previewMain" class="text-gray-900 text-lg flex-1 overflow-y-auto whitespace-pre-wrap"></div>
-                        <div id="previewSecondary" class="text-gray-600 text-sm mt-2"></div>
+                <!-- Formatting Toolbar (above preview) -->
+                <div class="mb-4">
+                    <div class="flex gap-1 flex-wrap border-b pb-2 bg-gray-50 p-2 rounded-t items-center">
+                        <!-- Heading selector -->
+                        <select id="headingLevel" onchange="applyHeading()" class="px-2 py-1 bg-white border border-gray-300 rounded text-sm" title="Уровень заголовка">
+                            <option value="p">Обычный текст</option>
+                            <option value="h1">H1 - Заголовок 1</option>
+                            <option value="h2">H2 - Заголовок 2</option>
+                            <option value="h3">H3 - Заголовок 3</option>
+                            <option value="h4">H4 - Заголовок 4</option>
+                        </select>
+                        <span class="border-l mx-2"></span>
+                        <button type="button" onclick="formatText('bold')" class="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 font-bold text-sm" title="Жирный (Ctrl+B)">B</button>
+                        <button type="button" onclick="formatText('italic')" class="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 italic text-sm" title="Курсив (Ctrl+I)">I</button>
+                        <button type="button" onclick="formatText('underline')" class="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 underline text-sm" title="Подчёркнутый (Ctrl+U)">U</button>
+                        <span class="border-l mx-2"></span>
+                        <div class="flex items-center gap-1">
+                            <label class="text-xs text-gray-600">Цвет:</label>
+                            <input type="color" id="selectionTextColor" value="#000000" class="h-8 w-10 rounded border cursor-pointer" onchange="applyTextColor()" title="Цвет текста">
+                        </div>
+                        <span class="border-l mx-2"></span>
+                        <button type="button" onclick="formatText('insertUnorderedList')" class="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm" title="Маркированный список">• Список</button>
+                        <button type="button" onclick="formatText('insertOrderedList')" class="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm" title="Нумерованный список">1. Нумерация</button>
+                        <span class="border-l mx-2"></span>
+                        <button type="button" onclick="formatText('removeFormat')" class="px-2 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-xs" title="Очистить форматирование">✕ Очистить</button>
                     </div>
-                    <div id="previewImagesForeground" class="absolute inset-0" style="z-index: 20; pointer-events: none;"></div>
+                </div>
+
+                <!-- Editable Slide Preview -->
+                <div id="slidePreview" class="mb-6 border-2 border-blue-400 rounded-lg bg-white relative preview-container" style="aspect-ratio: 16/9; overflow: hidden; width: 100%;">
+                    <!-- Background images layer - pointer-events: none on container, auto on children -->
+                    <div id="previewImagesBackground" class="absolute inset-0" style="z-index: 10; pointer-events: none;"></div>
+                    <!-- Editable text container - pointer-events: none on container, auto on editableContent -->
+                    <div class="absolute inset-0 p-8 flex flex-col" style="z-index: 20; pointer-events: none;">
+                        <div id="editableContent" 
+                             contenteditable="true"
+                             class="flex-1 overflow-y-auto focus:outline-none"
+                             style="cursor: text; pointer-events: auto;"
+                             oninput="syncContentToData()"
+                             placeholder="Кликните чтобы начать редактирование...">
+                            <h1>Заголовок слайда</h1>
+                            <p>Начните печатать...</p>
+                        </div>
+                    </div>
+                    <!-- Foreground images layer - pointer-events: none on container, auto on children -->
+                    <div id="previewImagesForeground" class="absolute inset-0" style="z-index: 30; pointer-events: none;"></div>
                 </div>
                 
                 <!-- Dimension Tooltip -->
                 <div id="dimensionTooltip" class="dimension-tooltip"></div>
-
-                <!-- Text Editors -->
-                <div class="space-y-4">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Заголовок (≤6 слов)</label>
-                        <input type="text" 
-                               id="titleInput" 
-                               class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                               placeholder="Краткий заголовок"
-                               oninput="updateSlidePreview()">
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">
-                            Основной текст
-                            <span class="text-gray-500 font-normal">(можно использовать списки и заголовки с ":"):</span>
-                        </label>
-                        <textarea id="mainTextInput" 
-                                  rows="16"
-                                  class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-mono text-sm"
-                                  placeholder="Основные цели:&#10;Разработать прототип&#10;Провести тестирование&#10;&#10;• Первый пункт&#10;• Второй пункт"
-                                  oninput="updateSlidePreview()"></textarea>
-                        <p class="text-xs text-gray-500 mt-1">
-                            Подсказка: Строки с ":" станут жирными заголовками, следующие строки - списком
-                        </p>
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">
-                            Дополнительный текст
-                        </label>
-                        <textarea id="secondaryTextInput" 
-                                  rows="4"
-                                  class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                                  placeholder="Сноски, комментарии"
-                                  oninput="updateSlidePreview()"></textarea>
-                    </div>
-
-                    <!-- Image Management -->
-                    <div class="pt-4 border-t">
-                        <h3 class="text-sm font-semibold text-gray-700 mb-2">Изображения</h3>
-                        <div class="space-y-2">
-                            <div id="imagesList" class="space-y-1 max-h-32 overflow-y-auto">
-                                <!-- Images will be listed here -->
-                            </div>
-                            <p class="text-xs text-gray-500">Добавление изображений доступно только через Drag & Drop на превью слайда.</p>
-                        </div>
-                    </div>
-
-                    <!-- Table Management -->
-                    <div class="pt-4 border-t">
-                        <h3 class="text-sm font-semibold text-gray-700 mb-2">Таблицы</h3>
-                        <div class="space-y-2">
-                            <button onclick="showTableModal()" class="w-full px-3 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 text-sm">
-                                📊 Добавить таблицу
-                            </button>
-                            <div id="tablesList" class="space-y-1 max-h-32 overflow-y-auto">
-                                <!-- Tables will be listed here -->
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Arrow Management -->
-                    <div class="pt-4 border-t">
-                        <h3 class="text-sm font-semibold text-gray-700 mb-2">Стрелки</h3>
-                        <div class="space-y-2">
-                            <button onclick="showArrowModal()" class="w-full px-3 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 text-sm">
-                                ➡️ Добавить стрелку
-                            </button>
-                            <div id="arrowsList" class="space-y-1 max-h-32 overflow-y-auto">
-                                <!-- Arrows will be listed here -->
-                            </div>
-                        </div>
-                    </div>
-                </div>
             </div>
         </div>
 
-        <!-- Info Panel -->
-        <div class="col-span-2">
+        <!-- Settings Panel (Right) -->
+        <div class="sidebar-panel">
             <div class="bg-white rounded-lg shadow p-4">
                 <h2 class="text-lg font-bold mb-4">Настройки</h2>
                 
@@ -305,21 +413,18 @@
                     </div>
 
                     <div class="pt-2 border-t">
-                        <h3 class="text-sm font-semibold text-gray-700 mb-2">Размеры</h3>
+                        <h3 class="text-sm font-semibold text-gray-700 mb-2">Размер шрифта</h3>
                     </div>
 
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Размер заголовка</label>
-                        <input type="range" id="titleSize" min="24" max="60" value="44" class="w-full"
-                               oninput="updatePreviewStyles(); document.getElementById('titleSizeValue').textContent = this.value">
-                        <span id="titleSizeValue" class="text-sm text-gray-600">44</span> PT
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Размер текста</label>
-                        <input type="range" id="textSize" min="12" max="32" value="18" class="w-full"
-                               oninput="updatePreviewStyles(); document.getElementById('textSizeValue').textContent = this.value">
-                        <span id="textSizeValue" class="text-sm text-gray-600">18</span> PT
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Размер выделенного текста</label>
+                        <input type="range" id="fontSize" min="8" max="72" value="18" class="w-full"
+                               oninput="applyFontSizeToSelection(); document.getElementById('fontSizeValue').textContent = this.value">
+                        <div class="flex justify-between items-center">
+                            <span id="fontSizeValue" class="text-sm text-gray-600">18</span>
+                            <span class="text-xs text-gray-500">PT</span>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1">Выделите текст и измените размер</p>
                     </div>
 
                     <!-- Font Selection -->
@@ -385,46 +490,103 @@
                         </select>
                     </div>
 
-                    <!-- Text Positioning -->
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Позиционирование текста</label>
+                    <!-- Slide Background -->
+                    <div class="pt-2 border-t">
+                        <h3 class="text-sm font-semibold text-gray-700 mb-2">Фон слайда</h3>
                         <div class="space-y-2">
-                            <div>
-                                <span class="text-xs text-gray-600">Вертикально:</span>
-                                <div class="flex gap-1 mt-1">
-                                    <button onclick="changeTextPosition('top', null)" id="posVertTop" class="flex-1 px-2 py-1 text-xs border border-gray-300 rounded bg-blue-100 border-blue-500">Сверху</button>
-                                    <button onclick="changeTextPosition('center', null)" id="posVertCenter" class="flex-1 px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50">По центру</button>
-                                    <button onclick="changeTextPosition('bottom', null)" id="posVertBottom" class="flex-1 px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50">Снизу</button>
+                            <label class="flex items-center">
+                                <input type="radio" name="bgType" value="none" checked onchange="changeBackgroundType('none')" class="mr-2">
+                                <span class="text-sm">Без фона (белый)</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="radio" name="bgType" value="solid" onchange="changeBackgroundType('solid')" class="mr-2">
+                                <span class="text-sm">Однотонный цвет</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="radio" name="bgType" value="gradient" onchange="changeBackgroundType('gradient')" class="mr-2">
+                                <span class="text-sm">Градиент</span>
+                            </label>
+                        </div>
+                        
+                        <!-- Solid color picker -->
+                        <div id="solidColorPicker" class="hidden mt-2">
+                            <label class="block text-xs text-gray-600 mb-1">Цвет фона</label>
+                            <input type="color" id="bgColor" value="#FFFFFF" class="w-full h-10 rounded border" onchange="updateBackground()">
+                        </div>
+                        
+                        <!-- Gradient picker -->
+                        <div id="gradientPicker" class="hidden mt-2 space-y-2">
+                            <div class="flex gap-2">
+                                <div class="flex-1">
+                                    <label class="block text-xs text-gray-600 mb-1">Цвет 1</label>
+                                    <input type="color" id="gradientColor1" value="#667eea" class="w-full h-8 rounded border" onchange="updateBackground()">
+                                </div>
+                                <div class="flex-1">
+                                    <label class="block text-xs text-gray-600 mb-1">Цвет 2</label>
+                                    <input type="color" id="gradientColor2" value="#764ba2" class="w-full h-8 rounded border" onchange="updateBackground()">
                                 </div>
                             </div>
-                            <div>
-                                <span class="text-xs text-gray-600">Горизонтально:</span>
-                                <div class="flex gap-1 mt-1">
-                                    <button onclick="changeTextPosition(null, 'left')" id="posHorizLeft" class="flex-1 px-2 py-1 text-xs border border-gray-300 rounded bg-blue-100 border-blue-500">Слева</button>
-                                    <button onclick="changeTextPosition(null, 'center')" id="posHorizCenter" class="flex-1 px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50">По центру</button>
-                                    <button onclick="changeTextPosition(null, 'right')" id="posHorizRight" class="flex-1 px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50">Справа</button>
-                                </div>
-                            </div>
+                            <select id="gradientDirection" class="w-full p-2 border rounded text-sm" onchange="updateBackground()">
+                                <option value="to right">Горизонтальный →</option>
+                                <option value="to bottom">Вертикальный ↓</option>
+                                <option value="to bottom right">Диагональный ↘</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Element Management -->
+                    <div class="pt-2 border-t">
+                        <h3 class="text-sm font-semibold text-gray-700 mb-2">Элементы</h3>
+                    </div>
+
+                    <!-- Images -->
+                    <div>
+                        <h4 class="text-xs font-medium text-gray-600 mb-1">Изображения</h4>
+                        <div id="imagesList" class="space-y-1 max-h-24 overflow-y-auto mb-2">
+                            <!-- Images will be listed here -->
+                        </div>
+                        <p class="text-xs text-gray-500">Drag & Drop на превью</p>
+                    </div>
+
+                    <!-- Tables -->
+                    <div class="mt-3">
+                        <h4 class="text-xs font-medium text-gray-600 mb-1">Таблицы</h4>
+                        <button onclick="showTableModal()" class="w-full px-2 py-1 bg-purple-500 text-white rounded text-xs hover:bg-purple-600 mb-1">
+                            + Добавить
+                        </button>
+                        <div id="tablesList" class="space-y-1 max-h-20 overflow-y-auto">
+                            <!-- Tables will be listed here -->
+                        </div>
+                    </div>
+
+                    <!-- Arrows -->
+                    <div class="mt-3">
+                        <h4 class="text-xs font-medium text-gray-600 mb-1">Стрелки</h4>
+                        <button onclick="showArrowModal()" class="w-full px-2 py-1 bg-orange-500 text-white rounded text-xs hover:bg-orange-600 mb-1">
+                            + Добавить
+                        </button>
+                        <div id="arrowsList" class="space-y-1 max-h-20 overflow-y-auto">
+                            <!-- Arrows will be listed here -->
+                        </div>
+                    </div>
+
+                    <!-- Accent Boxes -->
+                    <div class="mt-3">
+                        <h4 class="text-xs font-medium text-gray-600 mb-1">Акцентные блоки</h4>
+                        <button onclick="showAccentBoxModal()" class="w-full px-2 py-1 bg-indigo-500 text-white rounded text-xs hover:bg-indigo-600 mb-1">
+                            + Добавить
+                        </button>
+                        <div id="accentBoxesList" class="space-y-1 max-h-20 overflow-y-auto">
+                            <!-- Accent boxes will be listed here -->
                         </div>
                     </div>
 
                     <div class="pt-4 border-t">
                         <button onclick="applyToAll()" class="w-full px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm">
-                            Применить ко всем слайдам
+                            Применить ко всем
                         </button>
                     </div>
                 </div>
-            </div>
-
-            <!-- Info Panel -->
-            <div class="bg-blue-50 rounded-lg p-4 mt-4">
-                <h3 class="font-bold text-blue-900 mb-2">💡 Советы</h3>
-                <ul class="text-xs text-blue-800 space-y-1">
-                    <li>• Заголовки: до 6 слов</li>
-                    <li>• Используйте ":" для подзаголовков</li>
-                    <li>• "•" или "-" для списков</li>
-                    <li>• Пустая строка = новый раздел</li>
-                </ul>
             </div>
         </div>
     </div>
@@ -529,6 +691,20 @@
     </div>
 </div>
 
+<!-- Table Cell Editor Modal -->
+<div id="tableCellEditorModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg p-6 max-w-4xl w-full max-h-[80vh] overflow-y-auto">
+        <h3 class="text-lg font-bold mb-4">Редактирование ячеек таблицы</h3>
+        <div id="tableCellGrid" class="space-y-2 mb-4">
+            <!-- Cell grid will be dynamically generated -->
+        </div>
+        <div class="flex gap-2 mt-6">
+            <button onclick="saveCellData()" class="flex-1 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600">Сохранить</button>
+            <button onclick="closeCellEditor()" class="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400">Отмена</button>
+        </div>
+    </div>
+</div>
+
 <!-- Arrow Modal -->
 <div id="arrowModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
     <div class="bg-white rounded-lg p-6 max-w-md w-full">
@@ -580,6 +756,53 @@
     </div>
 </div>
 
+<!-- Accent Box Modal -->
+<div id="accentBoxModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg p-6 max-w-md w-full">
+        <h3 class="text-lg font-bold mb-4">Акцентный блок</h3>
+        <div class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium mb-2">Текст</label>
+                <textarea id="accentText" rows="3" class="w-full p-2 border rounded"></textarea>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+                <div>
+                    <label class="block text-sm text-gray-600">Цвет фона</label>
+                    <input type="color" id="accentBgColor" value="#E0E7FF" class="w-full h-10 rounded">
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-600">Цвет границы</label>
+                    <input type="color" id="accentBorderColor" value="#4F46E5" class="w-full h-10 rounded">
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+                <div>
+                    <label class="block text-sm text-gray-600">X</label>
+                    <input type="number" id="accentX" value="50" class="w-full p-2 border rounded">
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-600">Y</label>
+                    <input type="number" id="accentY" value="200" class="w-full p-2 border rounded">
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+                <div>
+                    <label class="block text-sm text-gray-600">Ширина</label>
+                    <input type="number" id="accentWidth" value="300" class="w-full p-2 border rounded">
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-600">Высота</label>
+                    <input type="number" id="accentHeight" value="100" class="w-full p-2 border rounded">
+                </div>
+            </div>
+        </div>
+        <div class="flex gap-2 mt-6">
+            <button onclick="addAccentBox()" class="flex-1 px-4 py-2 bg-indigo-500 text-white rounded-lg">Добавить</button>
+            <button onclick="closeAccentBoxModal()" class="flex-1 px-4 py-2 bg-gray-300 rounded-lg">Отмена</button>
+        </div>
+    </div>
+</div>
+
 <script>
 let slides = {{ slides_data | tojson }};
 let currentSlideIndex = 0;
@@ -607,6 +830,11 @@ let pendingSave = false;
 let lastSavedTime = null;
 let isSaving = false;
 
+// Responsive scaling state
+const BASELINE_PREVIEW_WIDTH = 800; // Reference width for default font sizes
+let currentScaleFactor = 1.0;
+let resizeDebounceTimer = null;
+
 // Initialize
 let isFirstLoad = true;
 document.addEventListener('DOMContentLoaded', async () => {
@@ -631,11 +859,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     const slidePreview = document.getElementById('slidePreview');
     if (slidePreview) {
         slidePreview.addEventListener('click', (e) => {
-            // Only deselect if clicking directly on preview background, not on images
+            // Only deselect if clicking directly on preview background or text area, not on images
+            // With pointer-events: none on containers, clicks fall through to the actual clickable elements
             if (e.target === slidePreview || 
                 e.target === document.getElementById('previewImagesBackground') ||
-                e.target === document.getElementById('previewImagesForeground')) {
-                console.log('=== PREVIEW BACKGROUND CLICKED ===');
+                e.target === document.getElementById('previewImagesForeground') ||
+                e.target === document.getElementById('editableContent') ||
+                e.target.closest('#editableContent')) {
+                console.log('=== PREVIEW BACKGROUND/TEXT CLICKED ===');
                 deselectAllImages();
             }
         });
@@ -649,6 +880,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     // Start auto-save timer
     startAutoSave();
+    
+    // Setup responsive scaling
+    setupResponsiveScaling();
 });
 
 function checkForGeneratedPresentation(jobId) {
@@ -674,9 +908,26 @@ function renderSlidesList() {
     }
     console.log('DEBUG renderSlidesList: slides count =', slides.length);
     container.innerHTML = slides.map((slide, index) => {
-        const title = slide.title || 'Без заголовка';
-        const preview = (slide.mainText || '').substring(0, 30);
-        console.log(`DEBUG slide ${index}: title='${title}', mainText length=${(slide.mainText || '').length}, preview='${preview}'`);
+        // Extract title and preview from content HTML
+        let title = 'Без заголовка';
+        let preview = '';
+        
+        if (slide.content) {
+            // Try to extract first heading as title
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = slide.content;
+            const heading = tempDiv.querySelector('h1, h2, h3, h4');
+            if (heading) {
+                title = heading.textContent.substring(0, 30);
+            }
+            // Extract text preview (remove HTML tags)
+            preview = tempDiv.textContent.replace(/\s+/g, ' ').trim().substring(0, 30);
+        } else if (slide.title) {
+            // Backward compatibility
+            title = slide.title;
+            preview = (slide.mainText || '').replace(/<[^>]*>/g, '').substring(0, 30);
+        }
+        
         return `
         <div onclick="loadSlide(${index})" 
              class="p-3 rounded cursor-pointer transition ${index === currentSlideIndex ? 'bg-blue-100 border-2 border-blue-500' : 'bg-gray-50 hover:bg-gray-100 border border-gray-200'}">
@@ -697,30 +948,60 @@ function loadSlide(index) {
     const slide = slides[index];
     
     console.log(`DEBUG loadSlide(${index}):`, slide);
-    console.log(`  title: '${slide.title}'`);
-    console.log(`  mainText: '${slide.mainText}'`);
-    console.log(`  mainText length: ${(slide.mainText || '').length}`);
 
     document.getElementById('currentSlideNumber').textContent = index + 1;
-    document.getElementById('titleInput').value = slide.title || '';
-    document.getElementById('mainTextInput').value = slide.mainText || '';
-    document.getElementById('secondaryTextInput').value = slide.secondaryText || '';
     
-    console.log(`  After setting inputs:`);
-    console.log(`    titleInput.value: '${document.getElementById('titleInput').value}'`);
-    console.log(`    mainTextInput.value: '${document.getElementById('mainTextInput').value}'`);
+    // Load editable content
+    const editor = document.getElementById('editableContent');
+    
+    // Handle both old format (title/mainText) and new format (content)
+    if (slide.content) {
+        // New format - direct HTML content
+        editor.innerHTML = slide.content;
+        console.log(`  Loaded from content field`);
+    } else if (slide.title || slide.mainText) {
+        // Migration from old format
+        let html = '';
+        if (slide.title) {
+            html += `<h1>${slide.title}</h1>`;
+        }
+        if (slide.mainText) {
+            // mainText might already be HTML from old contenteditable
+            html += slide.mainText;
+        }
+        editor.innerHTML = html || '<h1>Заголовок слайда</h1><p>Начните печатать...</p>';
+        // Save migrated content
+        slide.content = editor.innerHTML;
+        console.log(`  Migrated from title/mainText fields`);
+    } else {
+        // New slide with no content
+        editor.innerHTML = '<h1>Заголовок слайда</h1><p>Начните печатать...</p>';
+        console.log(`  Using default content`);
+    }
     
     // Load slide-specific settings
     if (slide.fontFamily) {
         document.getElementById('fontFamily').value = slide.fontFamily;
     }
-    if (slide.titleSize) {
-        document.getElementById('titleSize').value = slide.titleSize;
-        document.getElementById('titleSizeValue').textContent = slide.titleSize;
-    }
-    if (slide.textSize) {
-        document.getElementById('textSize').value = slide.textSize;
-        document.getElementById('textSizeValue').textContent = slide.textSize;
+    
+    // Load background settings
+    const background = slide.background || { type: 'none', color: '#FFFFFF' };
+    const bgType = background.type || 'none';
+    document.querySelector(`input[name="bgType"][value="${bgType}"]`).checked = true;
+    
+    if (bgType === 'solid') {
+        document.getElementById('bgColor').value = background.color || '#FFFFFF';
+        document.getElementById('solidColorPicker').classList.remove('hidden');
+        document.getElementById('gradientPicker').classList.add('hidden');
+    } else if (bgType === 'gradient' && background.gradient) {
+        document.getElementById('gradientColor1').value = background.gradient.color1 || '#667eea';
+        document.getElementById('gradientColor2').value = background.gradient.color2 || '#764ba2';
+        document.getElementById('gradientDirection').value = background.gradient.direction || 'to right';
+        document.getElementById('solidColorPicker').classList.add('hidden');
+        document.getElementById('gradientPicker').classList.remove('hidden');
+    } else {
+        document.getElementById('solidColorPicker').classList.add('hidden');
+        document.getElementById('gradientPicker').classList.add('hidden');
     }
 
     // Ensure Google Fonts are loaded when switching slides
@@ -730,6 +1011,7 @@ function loadSlide(index) {
     updateImagesList();
     updateTablesList();
     updateArrowsList();
+    updateAccentBoxesList();
     renderSlidesList();
 }
 
@@ -742,21 +1024,21 @@ function saveCurrentSlide() {
         };
     }
     
+    const editor = document.getElementById('editableContent');
+    
     slides[currentSlideIndex] = {
         ...slides[currentSlideIndex],
-        title: document.getElementById('titleInput').value,
-        mainText: document.getElementById('mainTextInput').value,
-        secondaryText: document.getElementById('secondaryTextInput').value,
+        content: editor.innerHTML,  // Save HTML content from inline editor
         fontFamily: document.getElementById('fontFamily').value,
-        titleSize: parseInt(document.getElementById('titleSize').value),
-        textSize: parseInt(document.getElementById('textSize').value),
+        background: slides[currentSlideIndex].background || { type: 'none', color: '#FFFFFF' },
         textPosition: {
             vertical: presentationSettings.defaultTextPosition.vertical,
             horizontal: presentationSettings.defaultTextPosition.horizontal
         },
         images: slides[currentSlideIndex].images || [],
         tables: slides[currentSlideIndex].tables || [],
-        arrows: slides[currentSlideIndex].arrows || []
+        arrows: slides[currentSlideIndex].arrows || [],
+        accentBoxes: slides[currentSlideIndex].accentBoxes || []
     };
     
     // Persist to localStorage
@@ -769,16 +1051,24 @@ function saveCurrentSlide() {
 }
 
 function updateSlidePreview() {
-    const title = document.getElementById('titleInput').value;
-    const mainText = document.getElementById('mainTextInput').value;
-    const secondaryText = document.getElementById('secondaryTextInput').value;
-
-    // Update text preview
-    document.getElementById('previewTitle').textContent = title;
-    document.getElementById('previewMain').innerHTML = formatMainText(mainText);
-    document.getElementById('previewSecondary').textContent = secondaryText;
-
+    // Preview IS the editor now, so we only need to:
+    // 1. Apply styles
+    // 2. Apply background
+    // 3. Render images
+    
     updatePreviewStyles();
+    
+    // Apply background to preview
+    const currentBackground = slides[currentSlideIndex]?.background || { type: 'none', color: '#FFFFFF' };
+    const preview = document.getElementById('slidePreview');
+    if (currentBackground.type === 'solid') {
+        preview.style.background = currentBackground.color;
+    } else if (currentBackground.type === 'gradient' && currentBackground.gradient) {
+        const g = currentBackground.gradient;
+        preview.style.background = `linear-gradient(${g.direction}, ${g.color1}, ${g.color2})`;
+    } else {
+        preview.style.background = '#FFFFFF';
+    }
     
     // Render images in layers
     renderPreviewImages();
@@ -838,9 +1128,18 @@ function createImageWrapper(imageData) {
     wrapper.style.width = `${imageData.size.width}px`;
     wrapper.style.height = `${imageData.size.height}px`;
     
+    // Apply rotation if exists
+    if (imageData.rotation) {
+        wrapper.style.transform = `rotate(${imageData.rotation}deg)`;
+        wrapper.dataset.rotation = imageData.rotation;
+    } else {
+        wrapper.dataset.rotation = '0';
+    }
+    
     console.log('Creating wrapper for image:', imageData.id);
     console.log('Wrapper position:', imageData.position);
     console.log('Wrapper size:', imageData.size);
+    console.log('Wrapper rotation:', imageData.rotation || 0);
     
     // Create image element
     const imgEl = document.createElement('img');
@@ -860,6 +1159,12 @@ function createImageWrapper(imageData) {
         handle.dataset.handle = handlePos;
         wrapper.appendChild(handle);
     });
+    
+    // Create rotation handle
+    const rotateHandle = document.createElement('div');
+    rotateHandle.className = 'rotate-handle';
+    rotateHandle.dataset.handle = 'rotate';
+    wrapper.appendChild(rotateHandle);
     
     // Create aspect ratio lock indicator
     if (imageData.aspectLocked !== false) {
@@ -902,71 +1207,47 @@ function createImageWrapper(imageData) {
 }
 
 function formatMainText(text) {
+    // This function is now deprecated - contenteditable handles formatting directly
+    // Kept for backward compatibility with old data
     if (!text) return '';
     
-    const lines = text.split('\n');
-    let html = '';
-    
-    for (let line of lines) {
-        if (line.trim().endsWith(':')) {
-            // Bold heading
-            html += `<div class="font-bold mt-2">${line}</div>`;
-        } else if (line.trim().startsWith('•') || line.trim().startsWith('-')) {
-            // Bullet point
-            html += `<div class="ml-4">${line}</div>`;
-        } else if (line.trim().match(/^\d+\./)) {
-            // Numbered list
-            html += `<div class="ml-4">${line}</div>`;
-        } else if (line.trim()) {
-            html += `<div>${line}</div>`;
-        } else {
-            html += '<div class="h-2"></div>';
-        }
+    // If text contains HTML tags, return as-is
+    if (/<[a-z][\s\S]*>/i.test(text)) {
+        return text;
     }
     
-    return html;
+    // Otherwise, treat as plain text and preserve line breaks
+    return text.replace(/\n/g, '<br>');
 }
 
 function updatePreviewStyles() {
-    const titleSize = document.getElementById('titleSize').value;
-    const textSize = document.getElementById('textSize').value;
     const fontFamily = document.getElementById('fontFamily').value;
     
-    document.getElementById('previewTitle').style.fontSize = `${titleSize}px`;
-    document.getElementById('previewMain').style.fontSize = `${textSize}px`;
-    document.getElementById('previewTitle').style.fontFamily = fontFamily;
-    document.getElementById('previewMain').style.fontFamily = fontFamily;
-    document.getElementById('previewSecondary').style.fontFamily = fontFamily;
-    
-    // Apply text positioning - ensure defaultTextPosition exists
-    if (!presentationSettings.defaultTextPosition) {
-        presentationSettings.defaultTextPosition = {
-            vertical: 'top',
-            horizontal: 'left'
-        };
+    const editor = document.getElementById('editableContent');
+    if (editor) {
+        // Apply font family to all content in the editor
+        editor.style.fontFamily = fontFamily;
+        
+        // Also apply font family to all existing elements to ensure consistency
+        const allElements = editor.querySelectorAll('*');
+        allElements.forEach(el => {
+            // Only set font-family if it's not already explicitly set
+            if (!el.style.fontFamily) {
+                el.style.fontFamily = fontFamily;
+            }
+        });
     }
-    
-    const previewContainer = document.getElementById('slidePreview').querySelector('.absolute');
-    const vertical = presentationSettings.defaultTextPosition.vertical;
-    const horizontal = presentationSettings.defaultTextPosition.horizontal;
-    
-    // Vertical alignment
-    previewContainer.style.justifyContent = 
-        vertical === 'top' ? 'flex-start' : 
-        vertical === 'center' ? 'center' : 'flex-end';
-    
-    // Horizontal alignment
-    previewContainer.style.alignItems = 
-        horizontal === 'left' ? 'flex-start' : 
-        horizontal === 'center' ? 'center' : 'flex-end';
 }
 
 function addNewSlide() {
     const newSlide = {
-        title: '',
-        mainText: '',
-        secondaryText: '',
-        role: 'CONTENT'
+        content: '<h1>Заголовок слайда</h1><p>Начните печатать...</p>',
+        role: 'CONTENT',
+        images: [],
+        tables: [],
+        arrows: [],
+        accentBoxes: [],
+        background: { type: 'none', color: '#FFFFFF' }
     };
     
     slides.push(newSlide);
@@ -991,8 +1272,6 @@ function deleteCurrentSlide() {
 }
 
 function applyToAll() {
-    const titleSize = document.getElementById('titleSize').value;
-    const textSize = document.getElementById('textSize').value;
     const fontFamily = document.getElementById('fontFamily').value;
     
     // Ensure defaultTextPosition exists
@@ -1006,8 +1285,6 @@ function applyToAll() {
     
     slides = slides.map(slide => ({
         ...slide,
-        titleSize: parseInt(titleSize),
-        textSize: parseInt(textSize),
         fontFamily: fontFamily,
         textPosition: {...textPosition}
     }));
@@ -1086,19 +1363,18 @@ function initializeSlideData() {
     slides = slides.map(slide => ({
         ...slide,
         fontFamily: slide.fontFamily || presentationSettings.defaultFont,
-        titleSize: slide.titleSize || 44,
-        textSize: slide.textSize || 18,
+        textColor: slide.textColor || '#000000',
         textPosition: slide.textPosition || {...presentationSettings.defaultTextPosition},
         images: slide.images || [],
         tables: slide.tables || [],
-        arrows: slide.arrows || []
+        arrows: slide.arrows || [],
+        accentBoxes: slide.accentBoxes || []
     }));
 }
 
 // Settings persistence functions
 function saveSettings() {
     presentationSettings.defaultFont = document.getElementById('fontFamily').value;
-    presentationSettings.defaultFontSize = parseInt(document.getElementById('textSize').value);
     
     try {
         localStorage.setItem(
@@ -1291,6 +1567,48 @@ function startAutoSave() {
     }, 60000); // 60 seconds
 }
 
+// Responsive scaling setup
+function setupResponsiveScaling() {
+    const preview = document.getElementById('slidePreview');
+    
+    // Try modern ResizeObserver first
+    if (typeof ResizeObserver !== 'undefined') {
+        const resizeObserver = new ResizeObserver((entries) => {
+            // Debounce the callback
+            if (resizeDebounceTimer) {
+                clearTimeout(resizeDebounceTimer);
+            }
+            
+            resizeDebounceTimer = setTimeout(() => {
+                for (let entry of entries) {
+                    console.log('Preview resized to:', entry.contentRect.width, 'x', entry.contentRect.height);
+                    updatePreviewStyles();
+                }
+            }, 150); // 150ms debounce
+        });
+        
+        resizeObserver.observe(preview);
+        console.log('ResizeObserver initialized for responsive scaling');
+    } else {
+        // Fallback to window resize event for older browsers
+        console.log('ResizeObserver not available, using window resize fallback');
+        window.addEventListener('resize', () => {
+            if (resizeDebounceTimer) {
+                clearTimeout(resizeDebounceTimer);
+            }
+            
+            resizeDebounceTimer = setTimeout(() => {
+                updatePreviewStyles();
+            }, 200); // 200ms debounce for window resize
+        });
+    }
+    
+    // Initial calculation
+    setTimeout(() => {
+        updatePreviewStyles();
+    }, 100);
+}
+
 function manualSave() {
     if (saveTimer) {
         clearTimeout(saveTimer);
@@ -1307,8 +1625,8 @@ function applyPageOrientation() {
     if (orientation === 'vertical') {
         // Portrait: keep height constrained and derive width from aspect ratio
         preview.style.aspectRatio = '9/16';
-        preview.style.height = '90vh';
-        preview.style.maxHeight = '90vh';
+        preview.style.height = '60vh';
+        preview.style.maxHeight = '60vh';
         preview.style.width = 'auto';
         preview.style.maxWidth = '100%';
         preview.style.display = 'inline-block';
@@ -1318,7 +1636,7 @@ function applyPageOrientation() {
         // Landscape: fill width but cap height
         preview.style.aspectRatio = '16/9';
         preview.style.height = 'auto';
-        preview.style.maxHeight = '85vh';
+        preview.style.maxHeight = '60vh';
         preview.style.width = '100%';
         preview.style.display = 'block';
         preview.style.marginLeft = '';
@@ -1326,6 +1644,11 @@ function applyPageOrientation() {
     }
     
     saveSettings();
+    
+    // Trigger font scaling recalculation after orientation change
+    setTimeout(() => {
+        updatePreviewStyles();
+    }, 100); // Small delay to allow layout to settle
 }
 
 // Font selection control
@@ -1387,6 +1710,323 @@ function changeTextPosition(vertical, horizontal) {
     
     updatePreviewStyles();
     saveSettings();
+}
+
+// Background control
+function changeBackgroundType(type) {
+    document.getElementById('solidColorPicker').classList.toggle('hidden', type !== 'solid');
+    document.getElementById('gradientPicker').classList.toggle('hidden', type !== 'gradient');
+    updateBackground();
+}
+
+function updateBackground() {
+    const bgType = document.querySelector('input[name="bgType"]:checked').value;
+    const preview = document.getElementById('slidePreview');
+    
+    let background = { type: bgType };
+    
+    if (bgType === 'none') {
+        preview.style.background = '#FFFFFF';
+        background.color = '#FFFFFF';
+    } else if (bgType === 'solid') {
+        const color = document.getElementById('bgColor').value;
+        preview.style.background = color;
+        background.color = color;
+    } else if (bgType === 'gradient') {
+        const c1 = document.getElementById('gradientColor1').value;
+        const c2 = document.getElementById('gradientColor2').value;
+        const dir = document.getElementById('gradientDirection').value;
+        preview.style.background = `linear-gradient(${dir}, ${c1}, ${c2})`;
+        background.gradient = { color1: c1, color2: c2, direction: dir };
+        // For backend, use first color as fallback since Google Slides doesn't support gradients
+        background.color = c1;
+    }
+    
+    slides[currentSlideIndex].background = background;
+}
+
+// Text formatting functions for contenteditable editor
+function formatText(command) {
+    // Focus the editable content
+    const editor = document.getElementById('editableContent');
+    editor.focus();
+    
+    // Execute the formatting command
+    document.execCommand(command, false, null);
+    
+    // Sync to data
+    syncContentToData();
+}
+
+// Apply text color to selected text
+function applyTextColor() {
+    const color = document.getElementById('selectionTextColor').value;
+    const editor = document.getElementById('editableContent');
+    editor.focus();
+    
+    // Apply color to selected text using foreColor command
+    document.execCommand('foreColor', false, color);
+    
+    // Sync to data
+    syncContentToData();
+}
+
+// Apply heading level to selected text/paragraph
+function applyHeading() {
+    const headingLevel = document.getElementById('headingLevel').value;
+    const editor = document.getElementById('editableContent');
+    editor.focus();
+    
+    // Get current selection
+    const selection = window.getSelection();
+    if (!selection.rangeCount) return;
+    
+    const range = selection.getRangeAt(0);
+    
+    // If text is selected (not collapsed), wrap only the selection
+    if (!range.collapsed) {
+        // Text is selected - apply heading only to selected text
+        try {
+            // Save the selected content
+            const fragment = range.cloneContents();
+            const textContent = fragment.textContent.trim();
+            
+            if (textContent) {
+                // Delete the selection
+                range.deleteContents();
+                
+                // Create new heading element with the selected text
+                const newHeading = document.createElement(headingLevel);
+                newHeading.textContent = textContent;
+                
+                // Insert the new heading
+                range.insertNode(newHeading);
+                
+                // Keep the heading selected (visual feedback)
+                range.selectNodeContents(newHeading);
+                selection.removeAllRanges();
+                selection.addRange(range);
+                
+                // Add a paragraph after if needed
+                if (!newHeading.nextSibling) {
+                    const p = document.createElement('p');
+                    p.innerHTML = '<br>';
+                    newHeading.parentNode.appendChild(p);
+                }
+            }
+        } catch (e) {
+            console.error('Error applying heading to selection:', e);
+        }
+    } else {
+        // No text selected - apply to current block only
+        let node = range.startContainer;
+        let blockElement = null;
+        
+        // Find the parent block element
+        while (node && node !== editor) {
+            if (node.nodeType === Node.ELEMENT_NODE && 
+                (node.tagName === 'P' || node.tagName === 'DIV' || 
+                 /^H[1-6]$/.test(node.tagName))) {
+                blockElement = node;
+                break;
+            }
+            node = node.parentNode;
+        }
+        
+        if (blockElement) {
+            // Convert this specific block to the desired heading type
+            const newElement = document.createElement(headingLevel);
+            newElement.innerHTML = blockElement.innerHTML;
+            blockElement.parentNode.replaceChild(newElement, blockElement);
+            
+            // Select the entire heading (visual feedback)
+            range.selectNodeContents(newElement);
+            selection.removeAllRanges();
+            selection.addRange(range);
+        }
+    }
+    
+    // Update styles and save
+    setTimeout(() => {
+        updatePreviewStyles();
+        syncContentToData();
+        updateHeadingSelector();
+    }, 10);
+}
+
+
+
+// Sync editable content to slide data
+function syncContentToData() {
+    const editor = document.getElementById('editableContent');
+    if (slides[currentSlideIndex]) {
+        slides[currentSlideIndex].content = editor.innerHTML;
+        
+        // Trigger auto-save
+        if (typeof triggerAutoSave === 'function') {
+            triggerAutoSave();
+        }
+    }
+}
+
+// Handle keyboard shortcuts
+document.addEventListener('DOMContentLoaded', function() {
+    const editor = document.getElementById('editableContent');
+    if (editor) {
+        // Keyboard shortcuts
+        editor.addEventListener('keydown', function(e) {
+            // Ctrl+B for bold
+            if (e.ctrlKey && e.key === 'b') {
+                e.preventDefault();
+                formatText('bold');
+            }
+            // Ctrl+I for italic
+            else if (e.ctrlKey && e.key === 'i') {
+                e.preventDefault();
+                formatText('italic');
+            }
+            // Ctrl+U for underline
+            else if (e.ctrlKey && e.key === 'u') {
+                e.preventDefault();
+                formatText('underline');
+            }
+        });
+        
+        // Update heading selector on cursor movement AND selection change
+        editor.addEventListener('click', updateHeadingSelector);
+        editor.addEventListener('keyup', updateHeadingSelector);
+        editor.addEventListener('mouseup', updateHeadingSelector); // Detect text selection with mouse
+        
+        // Also listen to selectionchange event for immediate detection
+        document.addEventListener('selectionchange', function() {
+            const selection = window.getSelection();
+            // Only update if selection is within our editor
+            if (selection.rangeCount > 0) {
+                const range = selection.getRangeAt(0);
+                const container = range.commonAncestorContainer;
+                if (editor.contains(container)) {
+                    updateHeadingSelector();
+                }
+            }
+        });
+    }
+});
+
+// Update heading dropdown to show current block type
+function updateHeadingSelector() {
+    const selection = window.getSelection();
+    if (!selection.rangeCount) return;
+    
+    const editor = document.getElementById('editableContent');
+    let node = selection.anchorNode;
+    
+    // If we have a selection (not just cursor), check the start of selection
+    const range = selection.getRangeAt(0);
+    if (!range.collapsed) {
+        // Text is selected - use the node at selection start
+        node = range.startContainer;
+    }
+    
+    // Walk up the tree to find the block element
+    while (node && node !== editor) {
+        if (node.nodeType === Node.ELEMENT_NODE) {
+            const tagName = node.tagName;
+            if (tagName === 'H1' || tagName === 'H2' || tagName === 'H3' || tagName === 'H4' || tagName === 'P') {
+                const dropdown = document.getElementById('headingLevel');
+                if (dropdown) {
+                    dropdown.value = tagName.toLowerCase();
+                    // Visual indicator that type is detected
+                    dropdown.style.backgroundColor = '#EFF6FF'; // Light blue background
+                    setTimeout(() => {
+                        dropdown.style.backgroundColor = ''; // Reset after brief moment
+                    }, 200);
+                }
+                
+                // Update font size slider based on selected text
+                updateFontSizeSlider(node);
+                return;
+            }
+        }
+        node = node.parentNode;
+    }
+    
+    // Default to paragraph
+    const dropdown = document.getElementById('headingLevel');
+    if (dropdown) {
+        dropdown.value = 'p';
+    }
+}
+
+// Update font size slider to show current text size
+function updateFontSizeSlider(element) {
+    if (!element) return;
+    
+    // Get computed font size
+    const computedStyle = window.getComputedStyle(element);
+    const fontSize = parseInt(computedStyle.fontSize);
+    
+    if (fontSize) {
+        const slider = document.getElementById('fontSize');
+        const display = document.getElementById('fontSizeValue');
+        if (slider && display) {
+            slider.value = fontSize;
+            display.textContent = fontSize;
+            // Brief highlight to show detection
+            slider.style.accentColor = '#3B82F6';
+            setTimeout(() => {
+                slider.style.accentColor = '';
+            }, 200);
+        }
+    }
+}
+
+// Apply font size to selected text
+function applyFontSizeToSelection() {
+    const fontSize = document.getElementById('fontSize').value;
+    const editor = document.getElementById('editableContent');
+    const selection = window.getSelection();
+    
+    if (!selection.rangeCount) return;
+    
+    const range = selection.getRangeAt(0);
+    
+    // If text is selected, apply size
+    if (!range.collapsed) {
+        editor.focus();
+        
+        // Use execCommand to apply font size
+        document.execCommand('fontSize', false, '7'); // Use a value that we'll override
+        
+        // Find and update all font elements that were just created
+        const fontElements = editor.querySelectorAll('font[size="7"]');
+        fontElements.forEach(font => {
+            font.removeAttribute('size');
+            font.style.fontSize = fontSize + 'px';
+        });
+        
+        // Also handle if selection already has inline styles
+        const selectedElement = range.commonAncestorContainer;
+        if (selectedElement.nodeType === Node.ELEMENT_NODE) {
+            selectedElement.style.fontSize = fontSize + 'px';
+        } else if (selectedElement.parentElement) {
+            selectedElement.parentElement.style.fontSize = fontSize + 'px';
+        }
+        
+        syncContentToData();
+    } else {
+        // No selection - find current block and update it
+        let node = range.startContainer;
+        while (node && node !== editor) {
+            if (node.nodeType === Node.ELEMENT_NODE && 
+                (node.tagName === 'H1' || node.tagName === 'H2' || node.tagName === 'H3' || 
+                 node.tagName === 'H4' || node.tagName === 'P')) {
+                node.style.fontSize = fontSize + 'px';
+                syncContentToData();
+                break;
+            }
+            node = node.parentNode;
+        }
+    }
 }
 
 // Image management functions
@@ -1614,6 +2254,8 @@ function updateImagesList() {
 }
 
 // Table management functions
+let currentEditingTableId = null;
+
 function showTableModal() {
     document.getElementById('tableModal').classList.remove('hidden');
 }
@@ -1643,8 +2285,63 @@ function addTable() {
     }
     slides[currentSlideIndex].tables.push(table);
     
-    updateTablesList();
+    // Close table creation modal and open cell editor
     closeTableModal();
+    editTableCells(table.id);
+}
+
+function editTableCells(tableId) {
+    currentEditingTableId = tableId;
+    const table = slides[currentSlideIndex].tables.find(t => t.id === tableId);
+    if (!table) return;
+    
+    // Generate cell grid
+    const grid = document.getElementById('tableCellGrid');
+    let html = '<div class="overflow-x-auto"><table class="w-full border-collapse border">';
+    
+    for (let row = 0; row < table.rows; row++) {
+        html += '<tr>';
+        for (let col = 0; col < table.columns; col++) {
+            const cellKey = `${row}_${col}`;
+            const cellValue = table.cellData[cellKey] || '';
+            html += `<td class="border p-1">
+                <input type="text" 
+                       id="cell_${cellKey}" 
+                       value="${cellValue}" 
+                       class="w-full p-2 border rounded text-sm" 
+                       placeholder="R${row+1}C${col+1}">
+            </td>`;
+        }
+        html += '</tr>';
+    }
+    html += '</table></div>';
+    grid.innerHTML = html;
+    
+    document.getElementById('tableCellEditorModal').classList.remove('hidden');
+}
+
+function saveCellData() {
+    const table = slides[currentSlideIndex].tables.find(t => t.id === currentEditingTableId);
+    if (!table) return;
+    
+    // Collect cell data from inputs
+    for (let row = 0; row < table.rows; row++) {
+        for (let col = 0; col < table.columns; col++) {
+            const cellKey = `${row}_${col}`;
+            const input = document.getElementById(`cell_${cellKey}`);
+            if (input) {
+                table.cellData[cellKey] = input.value;
+            }
+        }
+    }
+    
+    closeCellEditor();
+    updateTablesList();
+}
+
+function closeCellEditor() {
+    document.getElementById('tableCellEditorModal').classList.add('hidden');
+    currentEditingTableId = null;
 }
 
 function removeTable(tableId) {
@@ -1664,7 +2361,10 @@ function updateTablesList() {
     container.innerHTML = tables.map(tbl => `
         <div class="flex items-center justify-between p-2 bg-gray-50 rounded text-xs">
             <span>Таблица ${tbl.rows}x${tbl.columns}</span>
-            <button onclick="removeTable('${tbl.id}')" class="text-red-500 hover:text-red-700 ml-2">✕</button>
+            <div class="flex gap-1">
+                <button onclick="editTableCells('${tbl.id}')" class="text-blue-500 hover:text-blue-700" title="Редактировать">✎</button>
+                <button onclick="removeTable('${tbl.id}')" class="text-red-500 hover:text-red-700" title="Удалить">✕</button>
+            </div>
         </div>
     `).join('');
 }
@@ -1721,6 +2421,65 @@ function updateArrowsList() {
         <div class="flex items-center justify-between p-2 bg-gray-50 rounded text-xs">
             <span>Стрелка (${arr.type})</span>
             <button onclick="removeArrow('${arr.id}')" class="text-red-500 hover:text-red-700 ml-2">✕</button>
+        </div>
+    `).join('');
+}
+
+// Accent Box management functions
+function showAccentBoxModal() {
+    document.getElementById('accentBoxModal').classList.remove('hidden');
+}
+
+function closeAccentBoxModal() {
+    document.getElementById('accentBoxModal').classList.add('hidden');
+}
+
+function addAccentBox() {
+    const box = {
+        id: 'accent_' + Date.now(),
+        text: document.getElementById('accentText').value,
+        position: {
+            x: parseInt(document.getElementById('accentX').value),
+            y: parseInt(document.getElementById('accentY').value)
+        },
+        size: {
+            width: parseInt(document.getElementById('accentWidth').value),
+            height: parseInt(document.getElementById('accentHeight').value)
+        },
+        backgroundColor: document.getElementById('accentBgColor').value,
+        borderColor: document.getElementById('accentBorderColor').value,
+        borderWidth: 2,
+        textColor: '#1E1B4B',
+        fontSize: 14
+    };
+    
+    if (!slides[currentSlideIndex].accentBoxes) {
+        slides[currentSlideIndex].accentBoxes = [];
+    }
+    slides[currentSlideIndex].accentBoxes.push(box);
+    
+    updateAccentBoxesList();
+    closeAccentBoxModal();
+}
+
+function removeAccentBox(boxId) {
+    slides[currentSlideIndex].accentBoxes = slides[currentSlideIndex].accentBoxes.filter(box => box.id !== boxId);
+    updateAccentBoxesList();
+}
+
+function updateAccentBoxesList() {
+    const container = document.getElementById('accentBoxesList');
+    const boxes = slides[currentSlideIndex].accentBoxes || [];
+    
+    if (boxes.length === 0) {
+        container.innerHTML = '<div class="text-xs text-gray-500 p-2">Нет акцентных блоков</div>';
+        return;
+    }
+    
+    container.innerHTML = boxes.map(box => `
+        <div class="flex items-center justify-between p-2 bg-gray-50 rounded text-xs">
+            <span>Блок: ${box.text.substring(0, 20)}${box.text.length > 20 ? '...' : ''}</span>
+            <button onclick="removeAccentBox('${box.id}')" class="text-red-500 hover:text-red-700 ml-2">✕</button>
         </div>
     `).join('');
 }
@@ -1954,42 +2713,6 @@ setInterval(() => {
 }, 60000); // Every minute
 
 // Trigger auto-save on important actions
-function addNewSlide() {
-    const newSlide = {
-        title: '',
-        mainText: '',
-        secondaryText: '',
-        fontFamily: presentationSettings.defaultFont,
-        titleSize: 44,
-        textSize: 18,
-        textPosition: {...presentationSettings.defaultTextPosition},
-        images: [],
-        tables: [],
-        arrows: []
-    };
-    slides.push(newSlide);
-    renderSlidesList();
-    loadSlide(slides.length - 1);
-    saveSlides();
-    triggerAutoSave(); // Trigger backend save
-}
-
-function deleteCurrentSlide() {
-    if (slides.length <= 1) {
-        alert('Нельзя удалить последний слайд');
-        return;
-    }
-    if (confirm('Удалить этот слайд?')) {
-        slides.splice(currentSlideIndex, 1);
-        if (currentSlideIndex >= slides.length) {
-            currentSlideIndex = slides.length - 1;
-        }
-        renderSlidesList();
-        loadSlide(currentSlideIndex);
-        saveSlides();
-        triggerAutoSave(); // Trigger backend save
-    }
-}
 </script>
 <script>
 // ===== Interactive Image Manipulation Module =====
@@ -2043,8 +2766,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const slidePreview = document.getElementById('slidePreview');
     if (slidePreview) {
         slidePreview.addEventListener('click', (e) => {
-            // Only deselect if clicking directly on the preview background
-            if (e.target === slidePreview || e.target.id === 'previewImagesBackground' || e.target.id === 'previewImagesForeground') {
+            // Only deselect if clicking directly on the preview background or text content (not on images)
+            const editableContent = document.getElementById('editableContent');
+            if (e.target === slidePreview || 
+                e.target.id === 'previewImagesBackground' || 
+                e.target.id === 'previewImagesForeground' ||
+                e.target === editableContent ||
+                (editableContent && editableContent.contains(e.target))) {
                 deselectAllImages();
             }
         });
@@ -2052,6 +2780,8 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Initialize Interact.js on all image wrappers
+let isRotating = false; // Flag to prevent resize during rotation
+
 function initializeImageInteractions() {
     // Check if Interact.js is loaded
     if (typeof interact === 'undefined') {
@@ -2068,10 +2798,16 @@ function initializeImageInteractions() {
         
         if (!imageData) return;
         
+        // Store original dimensions for rotation
+        wrapper.dataset.origWidth = imageData.size.width;
+        wrapper.dataset.origHeight = imageData.size.height;
+        
         // Configure draggable
         interact(wrapper)
             .draggable({
                 inertia: false,
+                // Ignore drags starting on rotation/resize handles
+                ignoreFrom: '.rotate-handle, .resize-handle',
                 modifiers: [
                     interact.modifiers.restrictRect({
                         restriction: 'parent',
@@ -2080,9 +2816,12 @@ function initializeImageInteractions() {
                 ],
                 listeners: {
                     start: (event) => {
+                        // Don't start drag if rotating
+                        if (isRotating) return;
                         event.target.classList.add('dragging');
                     },
                     move: (event) => {
+                        if (isRotating) return;
                         const target = event.target;
                         const imageData = getImageData(imageId);
                         
@@ -2092,6 +2831,12 @@ function initializeImageInteractions() {
                         
                         target.style.left = `${x}px`;
                         target.style.top = `${y}px`;
+                        
+                        // CRITICAL: Preserve rotation during drag
+                        const rotation = parseFloat(target.dataset.rotation) || 0;
+                        if (rotation !== 0) {
+                            target.style.transform = `rotate(${rotation}deg)`;
+                        }
                         
                         // Update data model
                         if (imageData) {
@@ -2109,12 +2854,15 @@ function initializeImageInteractions() {
                     end: (event) => {
                         event.target.classList.remove('dragging');
                         hideDimensionTooltip();
-                        debouncedSave();
+                        if (!isRotating) debouncedSave();
                     }
                 }
             })
             .resizable({
-                edges: { left: true, right: true, bottom: true, top: true },
+                edges: { left: '.resize-handle.left, .resize-handle.bottom-left, .resize-handle.top-left', 
+                         right: '.resize-handle.right, .resize-handle.bottom-right, .resize-handle.top-right', 
+                         bottom: '.resize-handle.bottom, .resize-handle.bottom-left, .resize-handle.bottom-right', 
+                         top: '.resize-handle.top, .resize-handle.top-left, .resize-handle.top-right' },
                 modifiers: [
                     interact.modifiers.restrictSize({
                         min: { width: 20, height: 20 }
@@ -2129,6 +2877,11 @@ function initializeImageInteractions() {
                 ],
                 listeners: {
                     start: (event) => {
+                        // Block resize if rotating
+                        if (isRotating) {
+                            event.preventDefault();
+                            return;
+                        }
                         event.target.classList.add('resizing');
                         // Initialize position data from current styles
                         const target = event.target;
@@ -2136,6 +2889,9 @@ function initializeImageInteractions() {
                         target.dataset.y = parseFloat(target.style.top) || 0;
                     },
                     move: (event) => {
+                        // Skip resize if rotating
+                        if (isRotating) return;
+                        
                         const target = event.target;
                         const imageData = getImageData(imageId);
                         
@@ -2148,6 +2904,12 @@ function initializeImageInteractions() {
                         target.style.height = `${event.rect.height}px`;
                         target.style.left = `${x}px`;
                         target.style.top = `${y}px`;
+                        
+                        // CRITICAL: Preserve rotation during resize
+                        const rotation = parseFloat(target.dataset.rotation) || 0;
+                        if (rotation !== 0) {
+                            target.style.transform = `rotate(${rotation}deg)`;
+                        }
                         
                         // Store position for next move
                         target.dataset.x = x;
@@ -2170,6 +2932,8 @@ function initializeImageInteractions() {
                     },
                     end: (event) => {
                         event.target.classList.remove('resizing');
+                        if (isRotating) return;
+                        
                         const imageData = getImageData(imageId);
                         
                         // Recalculate aspect ratio after resize
@@ -2182,6 +2946,81 @@ function initializeImageInteractions() {
                     }
                 }
             });
+        
+        // Add rotation functionality to rotation handle
+        const rotateHandle = wrapper.querySelector('.rotate-handle');
+        if (rotateHandle) {
+            let startAngle = 0;
+            let currentRotation = parseFloat(wrapper.dataset.rotation) || 0;
+            let initialSize = null; // Store initial size to prevent resize during rotation
+            
+            rotateHandle.addEventListener('mousedown', (e) => {
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+                e.preventDefault();
+                
+                // Set rotation flag to prevent resize
+                isRotating = true;
+                
+                // Store initial size to restore if needed
+                initialSize = {
+                    width: parseFloat(wrapper.style.width) || imageData.size.width,
+                    height: parseFloat(wrapper.style.height) || imageData.size.height
+                };
+                
+                const rect = wrapper.getBoundingClientRect();
+                const centerX = rect.left + rect.width / 2;
+                const centerY = rect.top + rect.height / 2;
+                
+                startAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX) * 180 / Math.PI;
+                currentRotation = parseFloat(wrapper.dataset.rotation) || 0;
+                
+                const onMouseMove = (e) => {
+                    const angle = Math.atan2(e.clientY - centerY, e.clientX - centerX) * 180 / Math.PI;
+                    const rotation = currentRotation + (angle - startAngle);
+                    
+                    // ONLY update rotation, preserve size
+                    wrapper.style.transform = `rotate(${rotation}deg)`;
+                    wrapper.dataset.rotation = rotation;
+                    
+                    // Ensure size is preserved (prevent any resize interference)
+                    if (initialSize) {
+                        wrapper.style.width = `${initialSize.width}px`;
+                        wrapper.style.height = `${initialSize.height}px`;
+                    }
+                    
+                    // Show rotation tooltip
+                    showDimensionTooltip(
+                        e.clientX + 10,
+                        e.clientY + 10,
+                        `${Math.round(rotation)}°`
+                    );
+                };
+                
+                const onMouseUp = () => {
+                    document.removeEventListener('mousemove', onMouseMove);
+                    document.removeEventListener('mouseup', onMouseUp);
+                    
+                    // Save rotation to data model
+                    const imageData = getImageData(imageId);
+                    if (imageData) {
+                        imageData.rotation = parseFloat(wrapper.dataset.rotation) || 0;
+                    }
+                    
+                    hideDimensionTooltip();
+                    
+                    // Clear rotation flag after a small delay to prevent resize from triggering
+                    setTimeout(() => {
+                        isRotating = false;
+                    }, 50);
+                    
+                    debouncedSave();
+                };
+                
+                document.addEventListener('mousemove', onMouseMove);
+                document.addEventListener('mouseup', onMouseUp);
+            });
+        }
     });
 }
 
