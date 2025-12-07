@@ -147,7 +147,14 @@
 <div class="mx-auto px-4">
     <div class="mb-6 flex justify-between items-center">
         <h1 class="text-3xl font-bold text-gray-900">Редактор слайдов</h1>
-        <div class="flex gap-3">
+        <div class="flex gap-3 items-center">
+            <!-- Save status indicator -->
+            <div id="saveStatus" class="text-sm">
+                <span id="saveStatusText" class="text-gray-600"></span>
+            </div>
+            <button id="manualSaveBtn" onclick="manualSave()" class="px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 text-sm">
+                💾 Сохранить
+            </button>
             <button onclick="window.location.href='/'" class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600">
                 ← Назад
             </button>
@@ -594,13 +601,22 @@ let presentationSettings = {
 const urlParams = new URLSearchParams(window.location.search);
 const jobId = urlParams.get('job_id') || 'default';
 
+// Auto-save state
+let saveTimer = null;
+let pendingSave = false;
+let lastSavedTime = null;
+let isSaving = false;
+
 // Initialize
 let isFirstLoad = true;
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     console.log('DEBUG: Loaded slides data:', slides);
     console.log('DEBUG: First slide:', slides[0]);
     loadSettings();
-    loadSlidesFromStorage();  // Load saved slides from localStorage
+    
+    // Try loading from backend first, then merge with localStorage
+    await loadFromBackend();
+    
     initializeSlideData();
     renderSlidesList();
     loadSlide(0);
@@ -630,6 +646,9 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Setup file input handlers
     setupFileInputHandlers();
+    
+    // Start auto-save timer
+    startAutoSave();
 });
 
 function checkForGeneratedPresentation(jobId) {
@@ -715,6 +734,14 @@ function loadSlide(index) {
 }
 
 function saveCurrentSlide() {
+    // Ensure defaultTextPosition exists
+    if (!presentationSettings.defaultTextPosition) {
+        presentationSettings.defaultTextPosition = {
+            vertical: 'top',
+            horizontal: 'left'
+        };
+    }
+    
     slides[currentSlideIndex] = {
         ...slides[currentSlideIndex],
         title: document.getElementById('titleInput').value,
@@ -734,6 +761,11 @@ function saveCurrentSlide() {
     
     // Persist to localStorage
     saveSlides();
+    
+    // Trigger backend auto-save (if function is defined)
+    if (typeof triggerAutoSave === 'function') {
+        triggerAutoSave();
+    }
 }
 
 function updateSlidePreview() {
@@ -906,7 +938,14 @@ function updatePreviewStyles() {
     document.getElementById('previewMain').style.fontFamily = fontFamily;
     document.getElementById('previewSecondary').style.fontFamily = fontFamily;
     
-    // Apply text positioning
+    // Apply text positioning - ensure defaultTextPosition exists
+    if (!presentationSettings.defaultTextPosition) {
+        presentationSettings.defaultTextPosition = {
+            vertical: 'top',
+            horizontal: 'left'
+        };
+    }
+    
     const previewContainer = document.getElementById('slidePreview').querySelector('.absolute');
     const vertical = presentationSettings.defaultTextPosition.vertical;
     const horizontal = presentationSettings.defaultTextPosition.horizontal;
@@ -955,6 +994,14 @@ function applyToAll() {
     const titleSize = document.getElementById('titleSize').value;
     const textSize = document.getElementById('textSize').value;
     const fontFamily = document.getElementById('fontFamily').value;
+    
+    // Ensure defaultTextPosition exists
+    if (!presentationSettings.defaultTextPosition) {
+        presentationSettings.defaultTextPosition = {
+            vertical: 'top',
+            horizontal: 'left'
+        };
+    }
     const textPosition = presentationSettings.defaultTextPosition;
     
     slides = slides.map(slide => ({
@@ -1028,6 +1075,14 @@ async function generatePresentation(isUpdate = false) {
 
 // Initialize slide data with default values
 function initializeSlideData() {
+    // Ensure defaultTextPosition exists
+    if (!presentationSettings.defaultTextPosition) {
+        presentationSettings.defaultTextPosition = {
+            vertical: 'top',
+            horizontal: 'left'
+        };
+    }
+    
     slides = slides.map(slide => ({
         ...slide,
         fontFamily: slide.fontFamily || presentationSettings.defaultFont,
@@ -1100,6 +1155,147 @@ function loadSlidesFromStorage() {
     } catch (e) {
         console.warn('Failed to load slides from localStorage:', e);
     }
+}
+
+// Backend persistence functions
+async function loadFromBackend() {
+    if (!jobId || jobId === 'default') {
+        console.log('No job ID, using localStorage only');
+        loadSlidesFromStorage();
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/load_slides?job_id=${jobId}`);
+        if (response.ok) {
+            const data = await response.json();
+            
+            if (data.slides && data.slides.length > 0) {
+                console.log(`Loaded ${data.slides.length} slides from backend`);
+                
+                // Check localStorage timestamp
+                const localTimestamp = localStorage.getItem(`${jobId}_slides_timestamp`);
+                const backendTime = new Date(data.last_updated);
+                
+                if (localTimestamp) {
+                    const localTime = new Date(localTimestamp);
+                    if (localTime > backendTime) {
+                        console.log('localStorage is newer, loading from localStorage');
+                        loadSlidesFromStorage();
+                        // But show a merge option
+                        showMergeWarning(data.slides);
+                        return;
+                    }
+                }
+                
+                // Use backend data
+                slides = data.slides;
+                if (data.settings) {
+                    // Merge settings while preserving default structure
+                    presentationSettings = {
+                        pageOrientation: data.settings.pageOrientation || 'horizontal',
+                        defaultFont: data.settings.defaultFont || 'Arial',
+                        defaultFontSize: data.settings.defaultFontSize || 18,
+                        defaultTextPosition: {
+                            vertical: data.settings.defaultTextPosition?.vertical || 'top',
+                            horizontal: data.settings.defaultTextPosition?.horizontal || 'left'
+                        }
+                    };
+                }
+                lastSavedTime = new Date(data.last_updated);
+                updateLastSavedIndicator();
+            } else {
+                console.log('No slides in backend, trying localStorage');
+                loadSlidesFromStorage();
+            }
+        } else {
+            console.warn('Failed to load from backend, using localStorage');
+            loadSlidesFromStorage();
+            showLocalStorageFallbackWarning();
+        }
+    } catch (error) {
+        console.error('Error loading from backend:', error);
+        loadSlidesFromStorage();
+        showLocalStorageFallbackWarning();
+    }
+}
+
+async function saveToBackend() {
+    if (!jobId || jobId === 'default' || isSaving) {
+        console.log('Skipping backend save (no job ID or already saving)');
+        return;
+    }
+    
+    isSaving = true;
+    updateSavingIndicator(true);
+    
+    try {
+        // Save current slide first
+        if (currentSlideIndex >= 0 && currentSlideIndex < slides.length) {
+            saveCurrentSlide();
+        }
+        
+        const response = await fetch('/api/save_slides', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                job_id: jobId,
+                slides: slides,
+                settings: presentationSettings,
+                presentation_url: presentationUrl
+            })
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            lastSavedTime = new Date(data.timestamp);
+            localStorage.setItem(`${jobId}_slides_timestamp`, data.timestamp);
+            updateLastSavedIndicator();
+            console.log(`Saved ${data.slides_count} slides to backend`);
+        } else {
+            const error = await response.json();
+            console.error('Failed to save to backend:', error);
+            showSaveError();
+        }
+    } catch (error) {
+        console.error('Error saving to backend:', error);
+        showSaveError();
+    } finally {
+        isSaving = false;
+        updateSavingIndicator(false);
+    }
+}
+
+function triggerAutoSave() {
+    pendingSave = true;
+    
+    if (saveTimer) {
+        clearTimeout(saveTimer);
+    }
+    
+    // Debounce: save 30 seconds after last change
+    saveTimer = setTimeout(async () => {
+        if (pendingSave) {
+            await saveToBackend();
+            pendingSave = false;
+        }
+    }, 30000); // 30 seconds
+}
+
+function startAutoSave() {
+    // Periodic save every 60 seconds
+    setInterval(async () => {
+        if (slides && slides.length > 0 && !isSaving) {
+            await saveToBackend();
+        }
+    }, 60000); // 60 seconds
+}
+
+function manualSave() {
+    if (saveTimer) {
+        clearTimeout(saveTimer);
+    }
+    saveToBackend();
 }
 
 // Page orientation control
@@ -1661,6 +1857,137 @@ function setupFileInputHandlers() {
                 dropZoneInput.files = dataTransfer.files;
             }
         });
+    }
+}
+
+// UI Helper Functions for Save Status
+function updateLastSavedIndicator() {
+    const statusText = document.getElementById('saveStatusText');
+    if (!statusText) return;
+    
+    if (lastSavedTime) {
+        const now = new Date();
+        const diffMs = now - lastSavedTime;
+        const diffMins = Math.floor(diffMs / 60000);
+        
+        if (diffMins < 1) {
+            statusText.textContent = 'Сохранено только что';
+            statusText.className = 'text-green-600';
+        } else if (diffMins < 5) {
+            statusText.textContent = `Сохранено ${diffMins} мин назад`;
+            statusText.className = 'text-green-600';
+        } else {
+            statusText.textContent = `Сохранено ${diffMins} мин назад`;
+            statusText.className = 'text-gray-600';
+        }
+    }
+}
+
+function updateSavingIndicator(saving) {
+    const statusText = document.getElementById('saveStatusText');
+    const saveBtn = document.getElementById('manualSaveBtn');
+    
+    if (saving) {
+        statusText.textContent = 'Сохранение...';
+        statusText.className = 'text-blue-600';
+        if (saveBtn) saveBtn.disabled = true;
+    } else {
+        if (saveBtn) saveBtn.disabled = false;
+        updateLastSavedIndicator();
+    }
+}
+
+function showSaveError() {
+    const statusText = document.getElementById('saveStatusText');
+    if (statusText) {
+        statusText.textContent = '❌ Ошибка сохранения';
+        statusText.className = 'text-red-600';
+    }
+}
+
+function showLocalStorageFallbackWarning() {
+    // Create warning banner if it doesn't exist
+    if (!document.getElementById('localStorageWarning')) {
+        const banner = document.createElement('div');
+        banner.id = 'localStorageWarning';
+        banner.className = 'bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4';
+        banner.innerHTML = `
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                    </svg>
+                </div>
+                <div class="ml-3">
+                    <p class="text-sm text-yellow-700">
+                        ⚠️ Загружено из локального кэша - данные сервера недоступны. Изменения сохраняются только локально.
+                    </p>
+                </div>
+                <div class="ml-auto pl-3">
+                    <button onclick="this.parentElement.parentElement.parentElement.remove()" class="text-yellow-700 hover:text-yellow-900">
+                        <span class="sr-only">Dismiss</span>
+                        <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        `;
+        document.querySelector('.mx-auto.px-4').insertBefore(banner, document.querySelector('.mb-6'));
+    }
+}
+
+function showMergeWarning(backendSlides) {
+    // Store backend slides for potential merge
+    window.backendSlidesForMerge = backendSlides;
+    
+    // Show merge dialog (simplified version)
+    console.log('Merge conflict detected. localStorage is newer than backend.');
+    console.log('Using localStorage data. Backend data available in window.backendSlidesForMerge');
+}
+
+// Update save indicator periodically
+setInterval(() => {
+    if (lastSavedTime) {
+        updateLastSavedIndicator();
+    }
+}, 60000); // Every minute
+
+// Trigger auto-save on important actions
+function addNewSlide() {
+    const newSlide = {
+        title: '',
+        mainText: '',
+        secondaryText: '',
+        fontFamily: presentationSettings.defaultFont,
+        titleSize: 44,
+        textSize: 18,
+        textPosition: {...presentationSettings.defaultTextPosition},
+        images: [],
+        tables: [],
+        arrows: []
+    };
+    slides.push(newSlide);
+    renderSlidesList();
+    loadSlide(slides.length - 1);
+    saveSlides();
+    triggerAutoSave(); // Trigger backend save
+}
+
+function deleteCurrentSlide() {
+    if (slides.length <= 1) {
+        alert('Нельзя удалить последний слайд');
+        return;
+    }
+    if (confirm('Удалить этот слайд?')) {
+        slides.splice(currentSlideIndex, 1);
+        if (currentSlideIndex >= slides.length) {
+            currentSlideIndex = slides.length - 1;
+        }
+        renderSlidesList();
+        loadSlide(currentSlideIndex);
+        saveSlides();
+        triggerAutoSave(); // Trigger backend save
     }
 }
 </script>

@@ -6,6 +6,8 @@ Creates new Google Slides presentations with applied design.
 """
 
 from typing import Dict, Any
+import base64
+import io
 from ..auth.oauth_manager import OAuthManager
 from ..utils.logger import get_logger
 from ..utils.retry import retry_on_network_error
@@ -30,11 +32,17 @@ class PresentationBuilder:
         """Initialize presentation builder."""
         self.oauth_manager = oauth_manager
         self.slides_service = None
+        self.drive_service = None
     
     def _ensure_service(self) -> None:
         """Ensure Slides API service is initialized."""
         if self.slides_service is None:
             self.slides_service = self.oauth_manager.build_service('slides', 'v1')
+    
+    def _ensure_drive_service(self) -> None:
+        """Ensure Drive API service is initialized."""
+        if self.drive_service is None:
+            self.drive_service = self.oauth_manager.build_service('drive', 'v3')
     
     @retry_on_network_error()
     def build_simple_presentation(self, slides_data: list, title: str = "New Presentation", settings: dict = None) -> Dict[str, Any]:
@@ -933,9 +941,104 @@ class PresentationBuilder:
         
         return requests
     
+    def _upload_image_to_drive(self, data_url: str, file_name: str = "slide_image.png") -> str:
+        """
+        Upload base64-encoded data URL image to Google Drive and return public URL.
+        
+        Args:
+            data_url: Data URL string (e.g., "data:image/png;base64,...")
+            file_name: Name for the uploaded file
+            
+        Returns:
+            Public URL to the uploaded image on Google Drive
+            
+        Raises:
+            BuilderError: If upload fails
+        """
+        try:
+            self._ensure_drive_service()
+            
+            # Parse data URL to extract MIME type and base64 data
+            if not data_url.startswith('data:'):
+                raise BuilderError(f"Invalid data URL format")
+            
+            # Split: data:image/png;base64,iVBORw0KG...
+            header, encoded_data = data_url.split(',', 1)
+            mime_type = header.split(';')[0].split(':')[1]  # Extract 'image/png'
+            
+            # Decode base64 to binary
+            image_data = base64.b64decode(encoded_data)
+            
+            # Determine file extension from MIME type
+            extension_map = {
+                'image/png': '.png',
+                'image/jpeg': '.jpg',
+                'image/jpg': '.jpg',
+                'image/gif': '.gif',
+                'image/webp': '.webp'
+            }
+            extension = extension_map.get(mime_type, '.png')
+            
+            # Ensure file name has correct extension
+            if not file_name.endswith(extension):
+                file_name = f"{file_name}{extension}"
+            
+            # Create file metadata
+            file_metadata = {
+                'name': file_name,
+                'mimeType': mime_type
+            }
+            
+            # Upload to Drive using media upload
+            from googleapiclient.http import MediaIoBaseUpload
+            media = MediaIoBaseUpload(
+                io.BytesIO(image_data),
+                mimetype=mime_type,
+                resumable=True
+            )
+            
+            file = self.drive_service.files().create(
+                body=file_metadata,
+                media_body=media,
+                fields='id,webViewLink,webContentLink'
+            ).execute()
+            
+            file_id = file.get('id')
+            
+            # Make file publicly accessible
+            self.drive_service.permissions().create(
+                fileId=file_id,
+                body={
+                    'type': 'anyone',
+                    'role': 'reader'
+                }
+            ).execute()
+            
+            # Return direct download link (works with Google Slides API)
+            public_url = f"https://drive.google.com/uc?export=view&id={file_id}"
+            
+            logger.info(
+                f"Uploaded image to Google Drive",
+                operation="upload_image_to_drive",
+                file_id=file_id,
+                file_name=file_name,
+                size_bytes=len(image_data)
+            )
+            
+            return public_url
+            
+        except Exception as e:
+            logger.error(
+                f"Failed to upload image to Drive: {e}",
+                operation="upload_image_to_drive",
+                exc_info=True
+            )
+            raise BuilderError(f"Failed to upload image to Drive: {e}") from e
+    
     def _add_image(self, slide_id: str, image_data: dict, index) -> list:
         """
         Generate batch requests for image insertion.
+        Automatically uploads data URLs to Google Drive to bypass 2KB limit.
         
         Args:
             slide_id: Target slide object ID
@@ -954,6 +1057,25 @@ class PresentationBuilder:
         
         if not url:
             return requests
+        
+        # If URL is a data URL, upload to Google Drive first
+        # This bypasses the 2KB URL limit in Google Slides API
+        if url.startswith('data:'):
+            logger.info(
+                f"Detected data URL for image {image_id}, uploading to Drive",
+                operation="add_image",
+                data_url_length=len(url)
+            )
+            
+            # Generate unique file name
+            file_name = f"slide_{slide_id}_image_{index}"
+            url = self._upload_image_to_drive(url, file_name)
+            
+            logger.info(
+                f"Image uploaded, using Drive URL",
+                operation="add_image",
+                drive_url=url
+            )
         
         requests.append({
             'createImage': {

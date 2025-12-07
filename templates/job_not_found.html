@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}Работа не найдена{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto">
+    <div class="bg-white rounded-lg shadow-lg p-8">
+        <div class="text-center mb-8">
+            <div class="text-6xl mb-4">🔍</div>
+            <h1 class="text-3xl font-bold text-gray-900 mb-2">Работа не найдена</h1>
+            <p class="text-gray-600">ID задачи: <code class="bg-gray-100 px-2 py-1 rounded">{{ job_id }}</code></p>
+        </div>
+
+        <div class="bg-yellow-50 border-l-4 border-yellow-400 p-6 mb-6">
+            <div class="flex items-start">
+                <div class="flex-shrink-0">
+                    <svg class="h-6 w-6 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                    </svg>
+                </div>
+                <div class="ml-3">
+                    <h3 class="text-sm font-medium text-yellow-800 mb-2">Почему это произошло?</h3>
+                    <div class="text-sm text-yellow-700 space-y-2">
+                        <p>Эта работа была создана до внедрения системы сохранения данных. После перезапуска сервера такие работы теряются.</p>
+                        <p class="font-semibold">✨ Хорошая новость: Теперь все ваши работы автоматически сохраняются в базу данных и не будут потеряны!</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-blue-50 border-l-4 border-blue-400 p-6 mb-6">
+            <div class="flex items-start">
+                <div class="flex-shrink-0">
+                    <svg class="h-6 w-6 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+                    </svg>
+                </div>
+                <div class="ml-3">
+                    <h3 class="text-sm font-medium text-blue-800 mb-2">Что делать?</h3>
+                    <div class="text-sm text-blue-700 space-y-2">
+                        <p>1. Вернитесь на главную страницу</p>
+                        <p>2. Извлеките презентацию из Google Slides заново</p>
+                        <p>3. Теперь ваша работа будет:</p>
+                        <ul class="list-disc list-inside ml-4 mt-1">
+                            <li>Автоматически сохраняться каждые 60 секунд</li>
+                            <li>Доступна после перезапуска сервера</li>
+                            <li>Доступна в истории работ</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-green-50 border-l-4 border-green-400 p-6 mb-8">
+            <div class="flex items-start">
+                <div class="flex-shrink-0">
+                    <svg class="h-6 w-6 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                    </svg>
+                </div>
+                <div class="ml-3">
+                    <h3 class="text-sm font-medium text-green-800 mb-2">Новые возможности!</h3>
+                    <div class="text-sm text-green-700 space-y-1">
+                        <p>✅ Автоматическое сохранение работы</p>
+                        <p>✅ Восстановление после перезагрузки страницы</p>
+                        <p>✅ Доступ к работе после перезапуска сервера</p>
+                        <p>✅ История всех ваших работ</p>
+                        <p>✅ Индикатор состояния сохранения</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex gap-4 justify-center">
+            <a href="/" class="inline-flex items-center px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-medium">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+                </svg>
+                На главную страницу
+            </a>
+            
+            <a href="/history" class="inline-flex items-center px-6 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                История работ
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

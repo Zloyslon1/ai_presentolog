@@ -12,7 +12,9 @@ from pathlib import Path
 import threading
 import uuid
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
+import sqlite3
+import os
 
 # Add presentation_design to path
 sys.path.insert(0, str(Path(__file__).parent))
@@ -26,6 +28,194 @@ app.config['SECRET_KEY'] = 'dev-secret-key-change-in-production'
 
 # In-memory storage for processing jobs (use database in production)
 jobs = {}
+
+# Database configuration
+DB_PATH = os.path.join(os.path.dirname(__file__), 'db', 'presentation_jobs.db')
+
+def init_database():
+    """Initialize SQLite database with jobs table."""
+    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS jobs (
+            id TEXT PRIMARY KEY,
+            presentation_url TEXT,
+            template TEXT,
+            status TEXT,
+            created_at TIMESTAMP,
+            updated_at TIMESTAMP,
+            slides_json TEXT,
+            settings_json TEXT,
+            generated_presentation_id TEXT,
+            error TEXT
+        )
+    ''')
+    
+    # Create indexes for performance
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_created_at ON jobs(created_at)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_updated_at ON jobs(updated_at)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_status ON jobs(status)')
+    
+    conn.commit()
+    conn.close()
+    print(f"Database initialized at {DB_PATH}")
+
+def get_db_connection():
+    """Get database connection."""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+def save_job_to_db(job_id, job_data):
+    """Save job to database."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Serialize complex fields to JSON
+        slides_json = json.dumps(job_data.get('slides', []))
+        settings_json = json.dumps(job_data.get('settings', {}))
+        
+        cursor.execute('''
+            INSERT OR REPLACE INTO jobs 
+            (id, presentation_url, template, status, created_at, updated_at, 
+             slides_json, settings_json, generated_presentation_id, error)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            job_id,
+            job_data.get('url'),
+            job_data.get('template'),
+            job_data.get('status'),
+            job_data.get('created_at'),
+            datetime.now().isoformat(),
+            slides_json,
+            settings_json,
+            job_data.get('generated_presentation_id'),
+            job_data.get('error')
+        ))
+        
+        conn.commit()
+        conn.close()
+        print(f"Job {job_id} saved to database")
+        return True
+    except Exception as e:
+        print(f"Error saving job to database: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+def load_job_from_db(job_id):
+    """Load job from database."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute('SELECT * FROM jobs WHERE id = ?', (job_id,))
+        row = cursor.fetchone()
+        conn.close()
+        
+        if row:
+            # Convert row to dictionary
+            job_data = dict(row)
+            
+            # Deserialize JSON fields
+            if job_data.get('slides_json'):
+                try:
+                    job_data['slides'] = json.loads(job_data['slides_json'])
+                except json.JSONDecodeError:
+                    print(f"Warning: Failed to parse slides_json for job {job_id}")
+                    job_data['slides'] = []
+            else:
+                job_data['slides'] = []
+            
+            if job_data.get('settings_json'):
+                try:
+                    job_data['settings'] = json.loads(job_data['settings_json'])
+                except json.JSONDecodeError:
+                    print(f"Warning: Failed to parse settings_json for job {job_id}")
+                    job_data['settings'] = {}
+            else:
+                job_data['settings'] = {}
+            
+            # Map database fields to job format
+            job_data['url'] = job_data.get('presentation_url')
+            job_data['id'] = job_data.get('id')
+            
+            print(f"Job {job_id} loaded from database with {len(job_data.get('slides', []))} slides")
+            return job_data
+        
+        return None
+    except Exception as e:
+        print(f"Error loading job from database: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+def list_all_jobs(limit=50, offset=0):
+    """List all jobs from database."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT id, presentation_url, status, created_at, updated_at, 
+                   generated_presentation_id,
+                   CASE WHEN slides_json IS NOT NULL AND slides_json != '[]' THEN 1 ELSE 0 END as has_slides,
+                   LENGTH(slides_json) as slides_json_length
+            FROM jobs
+            ORDER BY created_at DESC
+            LIMIT ? OFFSET ?
+        ''', (limit, offset))
+        
+        rows = cursor.fetchall()
+        
+        # Get total count
+        cursor.execute('SELECT COUNT(*) as total FROM jobs')
+        total = cursor.fetchone()['total']
+        
+        conn.close()
+        
+        jobs_list = []
+        for row in rows:
+            job = dict(row)
+            # Calculate slides count from JSON length estimation (rough)
+            if job['slides_json_length']:
+                job['slides_count'] = max(1, job['slides_json_length'] // 200)
+            else:
+                job['slides_count'] = 0
+            jobs_list.append(job)
+        
+        return {'jobs': jobs_list, 'total': total, 'limit': limit, 'offset': offset}
+    except Exception as e:
+        print(f"Error listing jobs: {e}")
+        import traceback
+        traceback.print_exc()
+        return {'jobs': [], 'total': 0, 'limit': limit, 'offset': offset}
+
+def cleanup_old_jobs(days=30):
+    """Delete jobs older than specified days."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cutoff_date = datetime.now() - timedelta(days=days)
+        cursor.execute('DELETE FROM jobs WHERE created_at < ?', (cutoff_date.isoformat(),))
+        deleted_count = cursor.rowcount
+        
+        conn.commit()
+        conn.close()
+        
+        print(f"Deleted {deleted_count} jobs older than {days} days")
+        return deleted_count
+    except Exception as e:
+        print(f"Error cleaning up old jobs: {e}")
+        return 0
+
+# Initialize database on startup
+init_database()
 
 
 def get_template_list():
@@ -158,6 +348,9 @@ def extract_for_editor(job_id, presentation_url):
         jobs[job_id]['completed_at'] = datetime.now().isoformat()
         print(f"\nDEBUG: Saved to jobs['{job_id}']['slides'], count: {len(jobs[job_id]['slides'])}")
         
+        # Save to database
+        save_job_to_db(job_id, jobs[job_id])
+        
     except Exception as e:
         print(f"Error extracting presentation: {e}")
         import traceback
@@ -165,6 +358,9 @@ def extract_for_editor(job_id, presentation_url):
         jobs[job_id]['status'] = 'error'
         jobs[job_id]['error'] = str(e)
         jobs[job_id]['completed_at'] = datetime.now().isoformat()
+        
+        # Save error to database
+        save_job_to_db(job_id, jobs[job_id])
 
 
 def process_in_background(job_id, presentation_url, template_name):
@@ -192,13 +388,22 @@ def slide_editor():
     job_id = request.args.get('job_id')
     
     if job_id:
+        # Try to get from memory first, then from database
         job = jobs.get(job_id)
+        if not job:
+            # Try loading from database
+            job = load_job_from_db(job_id)
+            if job:
+                # Cache in memory
+                jobs[job_id] = job
+        
         if job:
             presentation_url = job.get('url')
             template = job.get('template', 'default')
             slides_data = job.get('slides', [])
         else:
-            return "Job not found", 404
+            # Job not found - show helpful error
+            return render_template('job_not_found.html', job_id=job_id), 404
     else:
         # Fallback to old method
         presentation_url = request.args.get('presentation_url')
@@ -225,13 +430,20 @@ def slide_editor():
                           presentation_url=presentation_url,
                           template=template,
                           slides_data=slides_data,
-                          templates=templates)
+                          templates=templates,
+                          job_id=job_id)
 
 
 @app.route('/extraction_status/<job_id>')
 def extraction_status(job_id):
     """Show extraction status and redirect to editor when ready."""
+    # Try memory first, then database
     job = jobs.get(job_id)
+    if not job:
+        job = load_job_from_db(job_id)
+        if job:
+            jobs[job_id] = job  # Cache in memory
+    
     if not job:
         return "Job not found", 404
     
@@ -270,8 +482,12 @@ def process_slides():
         'result': None,
         'error': None,
         'existing_presentation_id': existing_presentation_id,
-        'settings': settings  # Store settings
+        'settings': settings,  # Store settings
+        'slides': slides  # NEW: Store slides in job object
     }
+    
+    # Save to database immediately
+    save_job_to_db(job_id, jobs[job_id])
     
     # Process with edited slides
     thread = threading.Thread(
@@ -362,7 +578,13 @@ def process_slides_in_background(job_id, slides, template_name=None, existing_pr
 @app.route('/job/<job_id>')
 def job_status(job_id):
     """Show job status page."""
+    # Try memory first, then database
     job = jobs.get(job_id)
+    if not job:
+        job = load_job_from_db(job_id)
+        if job:
+            jobs[job_id] = job  # Cache in memory
+    
     if not job:
         return "Job not found", 404
     
@@ -374,20 +596,148 @@ def api_job_status(job_id):
     """API endpoint for job status (for AJAX polling)."""
     job = jobs.get(job_id)
     if not job:
+        # Try database
+        job = load_job_from_db(job_id)
+    
+    if not job:
         return jsonify({'error': 'Job not found'}), 404
     
-    return jsonify(job)
+    # Add metadata for frontend
+    response = {
+        'id': job.get('id'),
+        'url': job.get('url'),
+        'status': job.get('status'),
+        'created_at': job.get('created_at'),
+        'updated_at': job.get('updated_at'),
+        'generated_presentation_id': job.get('generated_presentation_id'),
+        'has_slides': len(job.get('slides', [])) > 0,
+        'slides_count': len(job.get('slides', []))
+    }
+    
+    return jsonify(response)
+
+
+@app.route('/api/save_slides', methods=['POST'])
+def api_save_slides():
+    """Save slides and settings to database."""
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+        
+        job_id = data.get('job_id')
+        slides = data.get('slides', [])
+        settings = data.get('settings', {})
+        
+        if not job_id:
+            return jsonify({'error': 'job_id is required'}), 400
+        
+        # Get or create job
+        job = jobs.get(job_id)
+        if not job:
+            # Try loading from database
+            job = load_job_from_db(job_id)
+            if not job:
+                # Create new job entry
+                job = {
+                    'id': job_id,
+                    'url': data.get('presentation_url', ''),
+                    'template': data.get('template', 'default'),
+                    'status': 'editing',
+                    'created_at': datetime.now().isoformat(),
+                    'slides': slides,
+                    'settings': settings
+                }
+                jobs[job_id] = job
+        
+        # Update job with new slides and settings
+        jobs[job_id]['slides'] = slides
+        jobs[job_id]['settings'] = settings
+        jobs[job_id]['updated_at'] = datetime.now().isoformat()
+        
+        # Save to database
+        success = save_job_to_db(job_id, jobs[job_id])
+        
+        if success:
+            return jsonify({
+                'status': 'saved',
+                'timestamp': jobs[job_id]['updated_at'],
+                'slides_count': len(slides)
+            })
+        else:
+            return jsonify({'error': 'Failed to save to database'}), 500
+            
+    except Exception as e:
+        print(f"Error in api_save_slides: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/load_slides', methods=['GET'])
+def api_load_slides():
+    """Load slides and settings from database."""
+    try:
+        job_id = request.args.get('job_id')
+        
+        if not job_id:
+            return jsonify({'error': 'job_id parameter is required'}), 400
+        
+        # Try memory first, then database
+        job = jobs.get(job_id)
+        if not job:
+            job = load_job_from_db(job_id)
+            if job:
+                # Cache in memory
+                jobs[job_id] = job
+        
+        if not job:
+            return jsonify({
+                'slides': [],
+                'settings': None,
+                'message': 'No saved slides found'
+            })
+        
+        return jsonify({
+            'slides': job.get('slides', []),
+            'settings': job.get('settings', {}),
+            'last_updated': job.get('updated_at', job.get('created_at')),
+            'status': job.get('status')
+        })
+        
+    except Exception as e:
+        print(f"Error in api_load_slides: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/history')
 def history():
-    """Show processing history."""
-    sorted_jobs = sorted(
-        jobs.values(),
-        key=lambda x: x['created_at'],
-        reverse=True
-    )
-    return render_template('history.html', jobs=sorted_jobs)
+    """Show processing history from database."""
+    # Get pagination parameters
+    page = request.args.get('page', 1, type=int)
+    limit = 50
+    offset = (page - 1) * limit
+    
+    # Load jobs from database
+    result = list_all_jobs(limit=limit, offset=offset)
+    jobs_list = result['jobs']
+    total = result['total']
+    
+    # Calculate pagination info
+    total_pages = (total + limit - 1) // limit
+    has_next = page < total_pages
+    has_prev = page > 1
+    
+    return render_template('history.html', 
+                          jobs=jobs_list,
+                          page=page,
+                          total_pages=total_pages,
+                          has_next=has_next,
+                          has_prev=has_prev,
+                          total=total)
 
 
 if __name__ == '__main__':
