@@ -299,6 +299,26 @@
     width: 100%;
     max-height: 60vh;
 }
+
+/* List styles in contenteditable */
+#editableContent ul {
+    list-style-type: disc;
+    padding-left: 2em;
+    margin: 0.5em 0;
+    color: inherit;
+}
+
+#editableContent ol {
+    list-style-type: decimal;
+    padding-left: 2em;
+    margin: 0.5em 0;
+    color: inherit;
+}
+
+#editableContent li {
+    margin: 0.25em 0;
+    color: inherit;
+}
 </style>
 <div class="fullscreen-container">
     <div class="mb-6 flex justify-between items-center">
@@ -357,13 +377,13 @@
                 <!-- Formatting Toolbar (above preview) -->
                 <div class="mb-4">
                     <div class="flex gap-1 flex-wrap border-b pb-2 bg-gray-50 p-2 rounded-t items-center">
-                        <!-- Heading selector -->
-                        <select id="headingLevel" onchange="applyHeading()" class="px-2 py-1 bg-white border border-gray-300 rounded text-sm" title="Уровень заголовка">
+                        <!-- Format selector (like in Word) -->
+                        <select id="formatSelector" onchange="applyFormat()" class="px-2 py-1 bg-white border border-gray-300 rounded text-sm min-w-[180px]" title="Формат">
                             <option value="p">Обычный текст</option>
-                            <option value="h1">H1 - Заголовок 1</option>
-                            <option value="h2">H2 - Заголовок 2</option>
-                            <option value="h3">H3 - Заголовок 3</option>
-                            <option value="h4">H4 - Заголовок 4</option>
+                            <option value="h1">Заголовок 1</option>
+                            <option value="h2">Заголовок 2</option>
+                            <option value="h3">Заголовок 3</option>
+                            <option value="h4">Заголовок 4</option>
                         </select>
                         <span class="border-l mx-2"></span>
                         <button type="button" onclick="formatText('bold')" class="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 font-bold text-sm" title="Жирный (Ctrl+B)">B</button>
@@ -375,10 +395,28 @@
                             <input type="color" id="selectionTextColor" value="#000000" class="h-8 w-10 rounded border cursor-pointer" onchange="applyTextColor()" title="Цвет текста">
                         </div>
                         <span class="border-l mx-2"></span>
-                        <button type="button" onclick="formatText('insertUnorderedList')" class="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm" title="Маркированный список">• Список</button>
-                        <button type="button" onclick="formatText('insertOrderedList')" class="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm" title="Нумерованный список">1. Нумерация</button>
+                        <!-- List format dropdown -->
+                        <select id="bulletListStyle" onchange="applyListStyle('ul')" class="px-2 py-1 bg-white border border-gray-300 rounded text-sm" title="Маркированный список">
+                            <option value="" disabled selected>• Список</option>
+                            <option value="disc">• Круглый</option>
+                            <option value="circle">○ Пустой круг</option>
+                            <option value="square">■ Квадрат</option>
+                            <option value="none">— Без маркера</option>
+                            <option value="remove">✕ Убрать список</option>
+                        </select>
+                        <!-- Numbering format dropdown -->
+                        <select id="numberListStyle" onchange="applyListStyle('ol')" class="px-2 py-1 bg-white border border-gray-300 rounded text-sm" title="Нумерованный список">
+                            <option value="" disabled selected>1. Нумерация</option>
+                            <option value="decimal">1, 2, 3...</option>
+                            <option value="decimal-leading-zero">01, 02, 03...</option>
+                            <option value="lower-alpha">a, b, c...</option>
+                            <option value="upper-alpha">A, B, C...</option>
+                            <option value="lower-roman">i, ii, iii...</option>
+                            <option value="upper-roman">I, II, III...</option>
+                            <option value="remove">✕ Убрать список</option>
+                        </select>
                         <span class="border-l mx-2"></span>
-                        <button type="button" onclick="formatText('removeFormat')" class="px-2 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-xs" title="Очистить форматирование">✕ Очистить</button>
+                        <button type="button" onclick="clearAllFormatting()" class="px-2 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-xs" title="Очистить форматирование">✕ Очистить</button>
                     </div>
                 </div>
 
@@ -514,6 +552,10 @@
                                 <input type="radio" name="bgType" value="gradient" onchange="changeBackgroundType('gradient')" class="mr-2">
                                 <span class="text-sm">Градиент</span>
                             </label>
+                            <label class="flex items-center">
+                                <input type="radio" name="bgType" value="image" onchange="changeBackgroundType('image')" class="mr-2">
+                                <span class="text-sm">Картинка</span>
+                            </label>
                         </div>
                         
                         <!-- Solid color picker -->
@@ -539,6 +581,16 @@
                                 <option value="to bottom">Вертикальный ↓</option>
                                 <option value="to bottom right">Диагональный ↘</option>
                             </select>
+                        </div>
+                        
+                        <!-- Image background picker -->
+                        <div id="imageBgPicker" class="hidden mt-2 space-y-2">
+                            <label class="block text-xs text-gray-600 mb-1">Фоновое изображение</label>
+                            <input type="file" id="bgImageInput" accept="image/*" class="hidden" onchange="handleBackgroundImageUpload(event)">
+                            <button type="button" onclick="document.getElementById('bgImageInput').click()" class="w-full px-2 py-1 bg-green-500 text-white rounded text-xs hover:bg-green-600 mb-1">
+                                + Загрузить фоновое изображение
+                            </button>
+                            <div id="bgImagePreview" class="text-xs text-gray-500"></div>
                         </div>
                     </div>
 
@@ -939,15 +991,26 @@ function loadSlide(index) {
         document.getElementById('bgColor').value = background.color || '#FFFFFF';
         document.getElementById('solidColorPicker').classList.remove('hidden');
         document.getElementById('gradientPicker').classList.add('hidden');
+        document.getElementById('imageBgPicker').classList.add('hidden');
     } else if (bgType === 'gradient' && background.gradient) {
         document.getElementById('gradientColor1').value = background.gradient.color1 || '#667eea';
         document.getElementById('gradientColor2').value = background.gradient.color2 || '#764ba2';
         document.getElementById('gradientDirection').value = background.gradient.direction || 'to right';
         document.getElementById('solidColorPicker').classList.add('hidden');
         document.getElementById('gradientPicker').classList.remove('hidden');
+        document.getElementById('imageBgPicker').classList.add('hidden');
+    } else if (bgType === 'image') {
+        document.getElementById('solidColorPicker').classList.add('hidden');
+        document.getElementById('gradientPicker').classList.add('hidden');
+        document.getElementById('imageBgPicker').classList.remove('hidden');
+        if (background.imageUrl) {
+            const info = document.getElementById('bgImagePreview');
+            if (info) info.textContent = 'Фоновое изображение загружено';
+        }
     } else {
         document.getElementById('solidColorPicker').classList.add('hidden');
         document.getElementById('gradientPicker').classList.add('hidden');
+        document.getElementById('imageBgPicker').classList.add('hidden');
     }
 
     // Ensure Google Fonts are loaded when switching slides
@@ -974,7 +1037,7 @@ function saveCurrentSlide() {
     
     slides[currentSlideIndex] = {
         ...slides[currentSlideIndex],
-        content: editor.innerHTML,  // Save HTML content from inline editor
+        content: editor.innerHTML,
         fontFamily: document.getElementById('fontFamily').value,
         background: slides[currentSlideIndex].background || { type: 'none', color: '#FFFFFF' },
         textPosition: {
@@ -987,13 +1050,8 @@ function saveCurrentSlide() {
         accentBoxes: slides[currentSlideIndex].accentBoxes || []
     };
     
-    // Persist to localStorage
-    saveSlides();
-    
-    // Trigger backend auto-save (if function is defined)
-    if (typeof triggerAutoSave === 'function') {
-        triggerAutoSave();
-    }
+    // All saves go to backend now
+    saveToBackend();
 }
 
 function updateSlidePreview() {
@@ -1008,11 +1066,19 @@ function updateSlidePreview() {
     const currentBackground = slides[currentSlideIndex]?.background || { type: 'none', color: '#FFFFFF' };
     const preview = document.getElementById('slidePreview');
     if (currentBackground.type === 'solid') {
+        preview.style.backgroundImage = '';
         preview.style.background = currentBackground.color;
     } else if (currentBackground.type === 'gradient' && currentBackground.gradient) {
         const g = currentBackground.gradient;
+        preview.style.backgroundImage = '';
         preview.style.background = `linear-gradient(${g.direction}, ${g.color1}, ${g.color2})`;
+    } else if (currentBackground.type === 'image' && currentBackground.imageUrl) {
+        preview.style.backgroundImage = `url(${currentBackground.imageUrl})`;
+        preview.style.backgroundSize = 'cover';
+        preview.style.backgroundPosition = 'center center';
+        preview.style.backgroundColor = '';
     } else {
+        preview.style.backgroundImage = '';
         preview.style.background = '#FFFFFF';
     }
     
@@ -1327,58 +1393,31 @@ function saveSettings() {
     }
 }
 
-function loadSettings() {
-    try {
-        const stored = localStorage.getItem('presentation_settings_' + jobId);
-        if (stored) {
-            const settings = JSON.parse(stored);
-            presentationSettings = {...presentationSettings, ...settings};
-            
-            // Apply to UI
-            document.getElementById('pageOrientation').value = presentationSettings.pageOrientation;
-            applyPageOrientation();
-        }
-    } catch (e) {
-        console.warn('Failed to load settings from localStorage:', e);
-    }
+// Settings persistence functions
+function saveSettings() {
+    presentationSettings.defaultFont = document.getElementById('fontFamily').value;
+    // Settings are now saved with slides to backend
 }
 
-// Slides data persistence functions
+function loadSettings() {
+    // Settings are loaded from backend with slides
+}
+
+// Slides data persistence functions - ALL HANDLED BY BACKEND NOW
 function saveSlides() {
-    try {
-        localStorage.setItem(
-            'slides_data_' + jobId,
-            JSON.stringify(slides)
-        );
-        console.log('Slides saved to localStorage');
-    } catch (e) {
-        console.warn('Failed to save slides to localStorage:', e);
-    }
+    // Trigger backend save immediately
+    saveToBackend();
 }
 
 function loadSlidesFromStorage() {
-    try {
-        const stored = localStorage.getItem('slides_data_' + jobId);
-        if (stored) {
-            const savedSlides = JSON.parse(stored);
-            // Merge saved data with server data - prefer saved if same number of slides
-            if (savedSlides.length === slides.length) {
-                slides = savedSlides;
-                console.log('Slides loaded from localStorage');
-            } else {
-                console.log('Slide count mismatch, using server data');
-            }
-        }
-    } catch (e) {
-        console.warn('Failed to load slides from localStorage:', e);
-    }
+    // No longer used - all data comes from backend
+    console.log('localStorage loading disabled - using backend only');
 }
 
 // Backend persistence functions
 async function loadFromBackend() {
     if (!jobId || jobId === 'default') {
-        console.log('No job ID, using localStorage only');
-        loadSlidesFromStorage();
+        console.warn('No job ID provided');
         return;
     }
     
@@ -1390,25 +1429,9 @@ async function loadFromBackend() {
             if (data.slides && data.slides.length > 0) {
                 console.log(`Loaded ${data.slides.length} slides from backend`);
                 
-                // Check localStorage timestamp
-                const localTimestamp = localStorage.getItem(`${jobId}_slides_timestamp`);
-                const backendTime = new Date(data.last_updated);
-                
-                if (localTimestamp) {
-                    const localTime = new Date(localTimestamp);
-                    if (localTime > backendTime) {
-                        console.log('localStorage is newer, loading from localStorage');
-                        loadSlidesFromStorage();
-                        // But show a merge option
-                        showMergeWarning(data.slides);
-                        return;
-                    }
-                }
-                
                 // Use backend data
                 slides = data.slides;
                 if (data.settings) {
-                    // Merge settings while preserving default structure
                     presentationSettings = {
                         pageOrientation: data.settings.pageOrientation || 'horizontal',
                         defaultFont: data.settings.defaultFont || 'Arial',
@@ -1422,17 +1445,14 @@ async function loadFromBackend() {
                 lastSavedTime = new Date(data.last_updated);
                 updateLastSavedIndicator();
             } else {
-                console.log('No slides in backend, trying localStorage');
-                loadSlidesFromStorage();
+                console.log('No slides in backend, using defaults');
             }
         } else {
-            console.warn('Failed to load from backend, using localStorage');
-            loadSlidesFromStorage();
+            console.warn('Failed to load from backend');
             showLocalStorageFallbackWarning();
         }
     } catch (error) {
         console.error('Error loading from backend:', error);
-        loadSlidesFromStorage();
         showLocalStorageFallbackWarning();
     }
 }
@@ -1447,9 +1467,10 @@ async function saveToBackend() {
     updateSavingIndicator(true);
     
     try {
-        // Save current slide first
-        if (currentSlideIndex >= 0 && currentSlideIndex < slides.length) {
-            saveCurrentSlide();
+        // Save current slide content first
+        const editor = document.getElementById('editableContent');
+        if (editor && currentSlideIndex >= 0 && currentSlideIndex < slides.length) {
+            slides[currentSlideIndex].content = editor.innerHTML;
         }
         
         const response = await fetch('/api/save_slides', {
@@ -1466,7 +1487,6 @@ async function saveToBackend() {
         if (response.ok) {
             const data = await response.json();
             lastSavedTime = new Date(data.timestamp);
-            localStorage.setItem(`${jobId}_slides_timestamp`, data.timestamp);
             updateLastSavedIndicator();
             console.log(`Saved ${data.slides_count} slides to backend`);
         } else {
@@ -1490,22 +1510,22 @@ function triggerAutoSave() {
         clearTimeout(saveTimer);
     }
     
-    // Debounce: save 30 seconds after last change
+    // Debounce: save 10 seconds after last change
     saveTimer = setTimeout(async () => {
         if (pendingSave) {
             await saveToBackend();
             pendingSave = false;
         }
-    }, 30000); // 30 seconds
+    }, 10000); // 10 seconds
 }
 
 function startAutoSave() {
-    // Periodic save every 60 seconds
+    // Periodic save every 30 seconds
     setInterval(async () => {
         if (slides && slides.length > 0 && !isSaving) {
             await saveToBackend();
         }
-    }, 60000); // 60 seconds
+    }, 30000); // 30 seconds
 }
 
 // Responsive scaling setup
@@ -1657,6 +1677,7 @@ function changeTextPosition(vertical, horizontal) {
 function changeBackgroundType(type) {
     document.getElementById('solidColorPicker').classList.toggle('hidden', type !== 'solid');
     document.getElementById('gradientPicker').classList.toggle('hidden', type !== 'gradient');
+    document.getElementById('imageBgPicker').classList.toggle('hidden', type !== 'image');
     updateBackground();
 }
 
@@ -1667,23 +1688,90 @@ function updateBackground() {
     let background = { type: bgType };
     
     if (bgType === 'none') {
+        preview.style.backgroundImage = '';
         preview.style.background = '#FFFFFF';
         background.color = '#FFFFFF';
     } else if (bgType === 'solid') {
         const color = document.getElementById('bgColor').value;
+        preview.style.backgroundImage = '';
         preview.style.background = color;
         background.color = color;
     } else if (bgType === 'gradient') {
         const c1 = document.getElementById('gradientColor1').value;
         const c2 = document.getElementById('gradientColor2').value;
         const dir = document.getElementById('gradientDirection').value;
+        preview.style.backgroundImage = '';
         preview.style.background = `linear-gradient(${dir}, ${c1}, ${c2})`;
         background.gradient = { color1: c1, color2: c2, direction: dir };
-        // For backend, use first color as fallback since Google Slides doesn't support gradients
         background.color = c1;
+    } else if (bgType === 'image') {
+        const currentBg = slides[currentSlideIndex].background || {};
+        const imageUrl = currentBg.imageUrl || background.imageUrl;
+        if (imageUrl) {
+            preview.style.backgroundImage = `url(${imageUrl})`;
+            preview.style.backgroundSize = 'cover';
+            preview.style.backgroundPosition = 'center center';
+            preview.style.backgroundColor = '';
+            background.imageUrl = imageUrl;
+        } else {
+            preview.style.backgroundImage = '';
+            preview.style.background = '#FFFFFF';
+            background.color = '#FFFFFF';
+        }
     }
     
-    slides[currentSlideIndex].background = background;
+    // Do NOT save huge background images into localStorage to avoid QuotaExceededError
+    try {
+        if (bgType !== 'image') {
+            slides[currentSlideIndex].background = background;
+            saveSlides();
+        } else {
+            slides[currentSlideIndex].background = background;
+        }
+    } catch (e) {
+        console.warn('Failed to persist background settings:', e);
+        slides[currentSlideIndex].background = background;
+    }
+}
+
+function handleBackgroundImageUpload(event) {
+    const file = event.target.files && event.target.files[0];
+    if (!file || !file.type.startsWith('image/')) return;
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const dataUrl = e.target.result;
+        
+        // Only store background image in slides, do not push to localStorage directly (too big)
+        slides[currentSlideIndex].background = {
+            type: 'image',
+            imageUrl: dataUrl
+        };
+        
+        const preview = document.getElementById('slidePreview');
+        preview.style.backgroundImage = `url(${dataUrl})`;
+        preview.style.backgroundSize = 'cover';
+        preview.style.backgroundPosition = 'center center';
+        preview.style.backgroundColor = '';
+        
+        const info = document.getElementById('bgImagePreview');
+        if (info) {
+            info.textContent = 'Фоновое изображение загружено';
+        }
+        
+        try {
+            // Try lightweight save of metadata only (without image) to avoid quota issues
+            const originalBg = slides[currentSlideIndex].background;
+            slides[currentSlideIndex].background = { type: 'image' };
+            saveSlides();
+            slides[currentSlideIndex].background = originalBg;
+        } catch (e2) {
+            console.warn('Skipping localStorage save for background image (too large):', e2);
+        }
+    };
+    reader.readAsDataURL(file);
+    
+    event.target.value = '';
 }
 
 // Text formatting functions for contenteditable editor
@@ -1712,87 +1800,237 @@ function applyTextColor() {
     syncContentToData();
 }
 
-// Apply heading level to selected text/paragraph
-function applyHeading() {
-    const headingLevel = document.getElementById('headingLevel').value;
+// Toggle list - only selected text becomes list item
+function toggleList(listType) {
     const editor = document.getElementById('editableContent');
     editor.focus();
     
-    // Get current selection
     const selection = window.getSelection();
     if (!selection.rangeCount) return;
     
     const range = selection.getRangeAt(0);
     
-    // If text is selected (not collapsed), wrap only the selection
+    // Check if we're already in a list
+    let node = range.commonAncestorContainer;
+    while (node && node !== editor) {
+        if (node.tagName === 'UL' || node.tagName === 'OL') {
+            // Already in list - use execCommand to toggle off
+            const command = listType === 'ul' ? 'insertUnorderedList' : 'insertOrderedList';
+            document.execCommand(command, false, null);
+            syncContentToData();
+            return;
+        }
+        node = node.parentNode;
+    }
+    
+    // Not in a list - check if there's selected text
     if (!range.collapsed) {
-        // Text is selected - apply heading only to selected text
-        try {
-            // Save the selected content
-            const fragment = range.cloneContents();
-            const textContent = fragment.textContent.trim();
+        // Text is selected - wrap only selected text in list
+        const selectedText = range.toString().trim();
+        
+        if (selectedText) {
+            // Split by newlines to create multiple list items
+            const lines = selectedText.split('\n').filter(line => line.trim());
             
-            if (textContent) {
-                // Delete the selection
-                range.deleteContents();
-                
-                // Create new heading element with the selected text
-                const newHeading = document.createElement(headingLevel);
-                newHeading.textContent = textContent;
-                
-                // Insert the new heading
-                range.insertNode(newHeading);
-                
-                // Keep the heading selected (visual feedback)
-                range.selectNodeContents(newHeading);
-                selection.removeAllRanges();
-                selection.addRange(range);
-                
-                // Add a paragraph after if needed
-                if (!newHeading.nextSibling) {
-                    const p = document.createElement('p');
-                    p.innerHTML = '<br>';
-                    newHeading.parentNode.appendChild(p);
-                }
+            // Create list HTML
+            const listTag = listType === 'ul' ? 'ul' : 'ol';
+            let listHTML = `<${listTag}>`;
+            
+            if (lines.length > 1) {
+                lines.forEach(line => {
+                    listHTML += `<li>${line.trim()}</li>`;
+                });
+            } else {
+                listHTML += `<li>${selectedText}</li>`;
             }
-        } catch (e) {
-            console.error('Error applying heading to selection:', e);
+            listHTML += `</${listTag}>`;
+            
+            // Delete selected content and insert list
+            document.execCommand('insertHTML', false, listHTML);
         }
     } else {
-        // No text selected - apply to current block only
-        let node = range.startContainer;
-        let blockElement = null;
-        
-        // Find the parent block element
-        while (node && node !== editor) {
-            if (node.nodeType === Node.ELEMENT_NODE && 
-                (node.tagName === 'P' || node.tagName === 'DIV' || 
-                 /^H[1-6]$/.test(node.tagName))) {
-                blockElement = node;
-                break;
-            }
-            node = node.parentNode;
-        }
-        
-        if (blockElement) {
-            // Convert this specific block to the desired heading type
-            const newElement = document.createElement(headingLevel);
-            newElement.innerHTML = blockElement.innerHTML;
-            blockElement.parentNode.replaceChild(newElement, blockElement);
-            
-            // Select the entire heading (visual feedback)
-            range.selectNodeContents(newElement);
-            selection.removeAllRanges();
-            selection.addRange(range);
-        }
+        // No selection - use standard execCommand for current line
+        const command = listType === 'ul' ? 'insertUnorderedList' : 'insertOrderedList';
+        document.execCommand(command, false, null);
     }
+    
+    syncContentToData();
+}
+
+// Apply list with specific style from dropdown
+function applyListStyle(listType) {
+    const editor = document.getElementById('editableContent');
+    editor.focus();
+    
+    // Get selected style
+    const styleDropdown = listType === 'ul' 
+        ? document.getElementById('bulletListStyle')
+        : document.getElementById('numberListStyle');
+    const listStyle = styleDropdown.value;
+    
+    if (!listStyle) return;
+    
+    const selection = window.getSelection();
+    if (!selection.rangeCount) {
+        styleDropdown.selectedIndex = 0;
+        return;
+    }
+    
+    const range = selection.getRangeAt(0);
+    
+    // Handle "remove" option - remove list formatting
+    if (listStyle === 'remove') {
+        removeListFormatting();
+        styleDropdown.selectedIndex = 0;
+        return;
+    }
+    
+    // Check if we're already in a list
+    let node = range.commonAncestorContainer;
+    let existingList = null;
+    
+    while (node && node !== editor) {
+        if (node.tagName === 'UL' || node.tagName === 'OL') {
+            existingList = node;
+            break;
+        }
+        node = node.parentNode;
+    }
+    
+    if (existingList) {
+        // Already in a list
+        const currentType = existingList.tagName.toLowerCase();
+        const newType = listType;
+        
+        if (currentType !== newType) {
+            // Convert list type using execCommand (toggle off current, toggle on new)
+            // First toggle off current
+            const offCommand = currentType === 'ul' ? 'insertUnorderedList' : 'insertOrderedList';
+            document.execCommand(offCommand, false, null);
+            // Then toggle on new
+            const onCommand = newType === 'ul' ? 'insertUnorderedList' : 'insertOrderedList';
+            document.execCommand(onCommand, false, null);
+            
+            // Apply style after conversion
+            setTimeout(() => {
+                let node = selection.anchorNode;
+                while (node && node !== editor) {
+                    if (node.tagName === 'UL' || node.tagName === 'OL') {
+                        node.style.listStyleType = listStyle;
+                        break;
+                    }
+                    node = node.parentNode;
+                }
+                syncContentToData();
+            }, 10);
+        } else {
+            // Same type - just update style
+            existingList.style.listStyleType = listStyle;
+            syncContentToData();
+        }
+    } else if (!range.collapsed) {
+        // Text is selected - wrap only selected text in list
+        const selectedText = range.toString().trim();
+        
+        if (selectedText) {
+            const lines = selectedText.split('\n').filter(line => line.trim());
+            const listTag = listType === 'ul' ? 'ul' : 'ol';
+            let listHTML = `<${listTag} style="list-style-type: ${listStyle};">`;
+            
+            if (lines.length > 1) {
+                lines.forEach(line => {
+                    listHTML += `<li>${line.trim()}</li>`;
+                });
+            } else {
+                listHTML += `<li>${selectedText}</li>`;
+            }
+            listHTML += `</${listTag}>`;
+            
+            document.execCommand('insertHTML', false, listHTML);
+            syncContentToData();
+        }
+    } else {
+        // No selection, not in list - create new list
+        const command = listType === 'ul' ? 'insertUnorderedList' : 'insertOrderedList';
+        document.execCommand(command, false, null);
+        
+        // Find the created list and apply style
+        setTimeout(() => {
+            let node = selection.anchorNode;
+            while (node && node !== editor) {
+                if (node.tagName === 'UL' || node.tagName === 'OL') {
+                    node.style.listStyleType = listStyle;
+                    break;
+                }
+                node = node.parentNode;
+            }
+            syncContentToData();
+        }, 10);
+    }
+    
+    // Reset dropdown to placeholder
+    styleDropdown.selectedIndex = 0;
+}
+
+// Remove list formatting from current position
+function removeListFormatting() {
+    const editor = document.getElementById('editableContent');
+    const selection = window.getSelection();
+    if (!selection.rangeCount) return;
+    
+    const range = selection.getRangeAt(0);
+    let node = range.commonAncestorContainer;
+    
+    while (node && node !== editor) {
+        if (node.tagName === 'UL') {
+            document.execCommand('insertUnorderedList', false, null);
+            syncContentToData();
+            return;
+        }
+        if (node.tagName === 'OL') {
+            document.execCommand('insertOrderedList', false, null);
+            syncContentToData();
+            return;
+        }
+        node = node.parentNode;
+    }
+}
+
+// Clear all formatting including lists
+function clearAllFormatting() {
+    const editor = document.getElementById('editableContent');
+    editor.focus();
+    
+    // First remove list if we're in one
+    removeListFormatting();
+    
+    // Then remove other formatting
+    document.execCommand('removeFormat', false, null);
+    
+    syncContentToData();
+}
+
+// Apply format from dropdown (like in Word) - uses execCommand for Ctrl+Z support
+function applyFormat() {
+    const formatValue = document.getElementById('formatSelector').value;
+    const editor = document.getElementById('editableContent');
+    editor.focus();
+    
+    // Use formatBlock command - this supports Ctrl+Z properly
+    document.execCommand('formatBlock', false, formatValue);
     
     // Update styles and save
     setTimeout(() => {
         updatePreviewStyles();
         syncContentToData();
-        updateHeadingSelector();
+        updateFormatSelector();
     }, 10);
+}
+
+// Apply heading level to selected text/paragraph (LEGACY - kept for compatibility)
+function applyHeading() {
+    // This is now handled by applyFormat()
+    applyFormat();
 }
 
 
@@ -1833,10 +2071,10 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
         
-        // Update heading selector on cursor movement AND selection change
-        editor.addEventListener('click', updateHeadingSelector);
-        editor.addEventListener('keyup', updateHeadingSelector);
-        editor.addEventListener('mouseup', updateHeadingSelector); // Detect text selection with mouse
+        // Update format selector on cursor movement AND selection change
+        editor.addEventListener('click', updateFormatSelector);
+        editor.addEventListener('keyup', updateFormatSelector);
+        editor.addEventListener('mouseup', updateFormatSelector); // Detect text selection with mouse
         
         // Also listen to selectionchange event for immediate detection
         document.addEventListener('selectionchange', function() {
@@ -1846,15 +2084,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 const range = selection.getRangeAt(0);
                 const container = range.commonAncestorContainer;
                 if (editor.contains(container)) {
-                    updateHeadingSelector();
+                    updateFormatSelector();
                 }
             }
         });
     }
 });
 
-// Update heading dropdown to show current block type
-function updateHeadingSelector() {
+// Update format dropdown to show current block type
+function updateFormatSelector() {
     const selection = window.getSelection();
     if (!selection.rangeCount) return;
     
@@ -1873,29 +2111,26 @@ function updateHeadingSelector() {
         if (node.nodeType === Node.ELEMENT_NODE) {
             const tagName = node.tagName;
             if (tagName === 'H1' || tagName === 'H2' || tagName === 'H3' || tagName === 'H4' || tagName === 'P') {
-                const dropdown = document.getElementById('headingLevel');
+                const dropdown = document.getElementById('formatSelector');
                 if (dropdown) {
                     dropdown.value = tagName.toLowerCase();
-                    // Visual indicator that type is detected
-                    dropdown.style.backgroundColor = '#EFF6FF'; // Light blue background
-                    setTimeout(() => {
-                        dropdown.style.backgroundColor = ''; // Reset after brief moment
-                    }, 200);
                 }
-                
-                // Update font size slider based on selected text
-                updateFontSizeSlider(node);
                 return;
             }
         }
         node = node.parentNode;
     }
     
-    // Default to paragraph
-    const dropdown = document.getElementById('headingLevel');
+    // Default to 'p' if no match
+    const dropdown = document.getElementById('formatSelector');
     if (dropdown) {
         dropdown.value = 'p';
     }
+}
+
+// LEGACY: Keep old name for compatibility
+function updateHeadingSelector() {
+    updateFormatSelector();
 }
 
 // Update font size slider to show current text size
