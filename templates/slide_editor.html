@@ -555,13 +555,13 @@
                             <option value="h4">Заголовок 4</option>
                         </select>
                         <span class="border-l mx-2"></span>
-                        <button type="button" onclick="formatText('bold')" class="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 font-bold text-sm" title="Жирный (Ctrl+B)">B</button>
-                        <button type="button" onclick="formatText('italic')" class="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 italic text-sm" title="Курсив (Ctrl+I)">I</button>
-                        <button type="button" onclick="formatText('underline')" class="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 underline text-sm" title="Подчёркнутый (Ctrl+U)">U</button>
+                        <button type="button" onmousedown="saveSelection()" onclick="formatText('bold')" class="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 font-bold text-sm" title="Жирный (Ctrl+B)">B</button>
+                        <button type="button" onmousedown="saveSelection()" onclick="formatText('italic')" class="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 italic text-sm" title="Курсив (Ctrl+I)">I</button>
+                        <button type="button" onmousedown="saveSelection()" onclick="formatText('underline')" class="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 underline text-sm" title="Подчёркнутый (Ctrl+U)">U</button>
                         <span class="border-l mx-2"></span>
                         <div class="flex items-center gap-1">
                             <label class="text-xs text-gray-600">Цвет:</label>
-                            <input type="color" id="selectionTextColor" value="#000000" class="h-8 w-10 rounded border cursor-pointer" onchange="applyTextColor()" title="Цвет текста">
+                            <input type="color" id="selectionTextColor" value="#000000" class="h-8 w-10 rounded border cursor-pointer" onmousedown="saveSelection()" onchange="applyTextColor()" title="Цвет текста">
                         </div>
                         <span class="border-l mx-2"></span>
                         <!-- List format dropdown -->
@@ -584,6 +584,17 @@
                             <option value="upper-roman">I, II, III...</option>
                             <option value="remove">✕ Убрать список</option>
                         </select>
+                        <!-- Indent buttons -->
+                        <button type="button" onclick="indentList()" class="px-2 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm" title="Увеличить отступ (Tab)">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"/>
+                            </svg>
+                        </button>
+                        <button type="button" onclick="outdentList()" class="px-2 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm" title="Уменьшить отступ (Shift+Tab)">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7M19 19l-7-7 7-7"/>
+                            </svg>
+                        </button>
                         <span class="border-l mx-2"></span>
                         <button type="button" onclick="clearAllFormatting()" class="px-2 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-xs" title="Очистить форматирование">✕ Очистить</button>
                     </div>
@@ -607,6 +618,8 @@
                     <div id="previewImages" class="absolute inset-0" style="z-index: 20; pointer-events: none;"></div>
                     <!-- Tables layer -->
                     <div id="previewTables" class="absolute inset-0" style="z-index: 15; pointer-events: none;"></div>
+                    <!-- Accent Boxes layer -->
+                    <div id="previewAccentBoxes" class="absolute inset-0" style="z-index: 12; pointer-events: none;"></div>
                 </div>
                 
                 <!-- Dimension Tooltip -->
@@ -622,10 +635,12 @@
                 <div class="space-y-4">
                     <!-- Page Orientation -->
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Ориентация</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Формат слайда</label>
                         <select id="pageOrientation" class="w-full p-2 border border-gray-300 rounded-lg" onchange="applyPageOrientation()">
-                            <option value="horizontal">Горизонтальный (16:9)</option>
-                            <option value="vertical">Вертикальный (9:16)</option>
+                            <option value="16:9">Широкоформатный (16:9)</option>
+                            <option value="4:3">Стандартный (4:3)</option>
+                            <option value="1:1">Квадратный (1:1)</option>
+                            <option value="9:16">Вертикальный (9:16)</option>
                         </select>
                     </div>
 
@@ -636,7 +651,7 @@
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Размер выделенного текста</label>
                         <input type="range" id="fontSize" min="8" max="72" value="18" class="w-full"
-                               oninput="applyFontSizeToSelection(); document.getElementById('fontSizeValue').textContent = this.value">
+                               onmousedown="saveSelection()" oninput="applyFontSizeToSelection(); document.getElementById('fontSizeValue').textContent = this.value">
                         <div class="flex justify-between items-center">
                             <span id="fontSizeValue" class="text-sm text-gray-600">18</span>
                             <span class="text-xs text-gray-500">PT</span>
@@ -705,6 +720,61 @@
                                 <option data-google="true" value="Teko">Teko</option>
                             </optgroup>
                         </select>
+                    </div>
+
+                    <!-- Text Alignment -->
+                    <div class="pt-2 border-t">
+                        <h3 class="text-sm font-semibold text-gray-700 mb-2">Выравнивание текста</h3>
+                        
+                        <!-- Horizontal Alignment -->
+                        <div class="mb-3">
+                            <label class="block text-xs text-gray-600 mb-1">По горизонтали</label>
+                            <div class="flex gap-1">
+                                <button id="posHorizLeft" onclick="changeTextPosition(null, 'left')" 
+                                        class="flex-1 p-2 border rounded text-sm hover:bg-gray-50 bg-blue-100 border-blue-500" title="По левому краю">
+                                    <svg class="w-4 h-4 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h10M4 18h14"/>
+                                    </svg>
+                                </button>
+                                <button id="posHorizCenter" onclick="changeTextPosition(null, 'center')" 
+                                        class="flex-1 p-2 border rounded text-sm hover:bg-gray-50" title="По центру">
+                                    <svg class="w-4 h-4 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M7 12h10M5 18h14"/>
+                                    </svg>
+                                </button>
+                                <button id="posHorizRight" onclick="changeTextPosition(null, 'right')" 
+                                        class="flex-1 p-2 border rounded text-sm hover:bg-gray-50" title="По правому краю">
+                                    <svg class="w-4 h-4 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M10 12h10M6 18h14"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Vertical Alignment -->
+                        <div>
+                            <label class="block text-xs text-gray-600 mb-1">По вертикали</label>
+                            <div class="flex gap-1">
+                                <button id="posVertTop" onclick="changeTextPosition('top', null)" 
+                                        class="flex-1 p-2 border rounded text-sm hover:bg-gray-50 bg-blue-100 border-blue-500" title="Сверху">
+                                    <svg class="w-4 h-4 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 4h14M12 8v12"/>
+                                    </svg>
+                                </button>
+                                <button id="posVertCenter" onclick="changeTextPosition('center', null)" 
+                                        class="flex-1 p-2 border rounded text-sm hover:bg-gray-50" title="По центру">
+                                    <svg class="w-4 h-4 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 12h16M12 6v12"/>
+                                    </svg>
+                                </button>
+                                <button id="posVertBottom" onclick="changeTextPosition('bottom', null)" 
+                                        class="flex-1 p-2 border rounded text-sm hover:bg-gray-50" title="Снизу">
+                                    <svg class="w-4 h-4 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 20h14M12 4v12"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Slide Background -->
@@ -951,47 +1021,86 @@
 
 <!-- Accent Box Modal -->
 <div id="accentBoxModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-    <div class="bg-white rounded-lg p-6 max-w-md w-full">
-        <h3 class="text-lg font-bold mb-4">Акцентный блок</h3>
-        <div class="space-y-4">
+    <div class="bg-white rounded-lg p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
+        <h3 id="accentBoxModalTitle" class="text-lg font-bold mb-4">Акцентный блок</h3>
+        <div class="space-y-3">
             <div>
-                <label class="block text-sm font-medium mb-2">Текст</label>
-                <textarea id="accentText" rows="3" class="w-full p-2 border rounded"></textarea>
+                <label class="block text-sm font-medium mb-1">Текст</label>
+                <div id="accentText" contenteditable="true" class="w-full p-2 border rounded text-sm min-h-[60px] max-h-[120px] overflow-y-auto focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
             </div>
+            
+            <!-- Font Settings -->
             <div class="grid grid-cols-2 gap-2">
                 <div>
-                    <label class="block text-sm text-gray-600">Цвет фона</label>
-                    <input type="color" id="accentBgColor" value="#E0E7FF" class="w-full h-10 rounded">
+                    <label class="block text-xs text-gray-600 mb-1">Шрифт</label>
+                    <select id="accentFontFamily" onchange="updateAccentTextPreview()" class="w-full p-1.5 border rounded text-sm">
+                        <option value="Arial">Arial</option>
+                        <option value="Times New Roman">Times New Roman</option>
+                        <option value="Georgia">Georgia</option>
+                        <option value="Verdana">Verdana</option>
+                        <option value="Roboto">Roboto</option>
+                        <option value="Open Sans">Open Sans</option>
+                        <option value="Montserrat">Montserrat</option>
+                    </select>
                 </div>
                 <div>
-                    <label class="block text-sm text-gray-600">Цвет границы</label>
-                    <input type="color" id="accentBorderColor" value="#4F46E5" class="w-full h-10 rounded">
-                </div>
-            </div>
-            <div class="grid grid-cols-2 gap-2">
-                <div>
-                    <label class="block text-sm text-gray-600">X</label>
-                    <input type="number" id="accentX" value="50" class="w-full p-2 border rounded">
-                </div>
-                <div>
-                    <label class="block text-sm text-gray-600">Y</label>
-                    <input type="number" id="accentY" value="200" class="w-full p-2 border rounded">
+                    <label class="block text-xs text-gray-600 mb-1">Размер шрифта</label>
+                    <input type="number" id="accentFontSize" value="14" min="8" max="72" onchange="updateAccentTextPreview()" oninput="updateAccentTextPreview()" class="w-full p-1.5 border rounded text-sm">
                 </div>
             </div>
-            <div class="grid grid-cols-2 gap-2">
+            
+            <!-- Text Formatting -->
+            <div>
+                <label class="block text-xs text-gray-600 mb-1">Форматирование</label>
+                <div class="flex gap-1">
+                    <button type="button" id="accentBold" onclick="toggleAccentFormat('bold')" 
+                            class="px-3 py-1.5 border rounded text-sm font-bold hover:bg-gray-100">B</button>
+                    <button type="button" id="accentItalic" onclick="toggleAccentFormat('italic')" 
+                            class="px-3 py-1.5 border rounded text-sm italic hover:bg-gray-100">I</button>
+                    <button type="button" id="accentUnderline" onclick="toggleAccentFormat('underline')" 
+                            class="px-3 py-1.5 border rounded text-sm underline hover:bg-gray-100">U</button>
+                </div>
+            </div>
+            
+            <!-- Colors -->
+            <div class="grid grid-cols-3 gap-2">
                 <div>
-                    <label class="block text-sm text-gray-600">Ширина</label>
-                    <input type="number" id="accentWidth" value="300" class="w-full p-2 border rounded">
+                    <label class="block text-xs text-gray-600 mb-1">Цвет текста</label>
+                    <input type="color" id="accentTextColor" value="#1E1B4B" oninput="updateAccentTextPreview()" class="w-full h-8 rounded cursor-pointer">
                 </div>
                 <div>
-                    <label class="block text-sm text-gray-600">Высота</label>
-                    <input type="number" id="accentHeight" value="100" class="w-full p-2 border rounded">
+                    <label class="block text-xs text-gray-600 mb-1">Цвет фона</label>
+                    <input type="color" id="accentBgColor" value="#E0E7FF" oninput="updateAccentTextPreview()" class="w-full h-8 rounded cursor-pointer">
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-600 mb-1">Цвет рамки</label>
+                    <input type="color" id="accentBorderColor" value="#4F46E5" oninput="updateAccentTextPreview()" class="w-full h-8 rounded cursor-pointer">
+                </div>
+            </div>
+            
+            <!-- Position -->
+            <div class="grid grid-cols-4 gap-2">
+                <div>
+                    <label class="block text-xs text-gray-600 mb-1">X</label>
+                    <input type="number" id="accentX" value="50" class="w-full p-1.5 border rounded text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-600 mb-1">Y</label>
+                    <input type="number" id="accentY" value="200" class="w-full p-1.5 border rounded text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-600 mb-1">Ширина</label>
+                    <input type="number" id="accentWidth" value="300" class="w-full p-1.5 border rounded text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-600 mb-1">Высота</label>
+                    <input type="number" id="accentHeight" value="100" class="w-full p-1.5 border rounded text-sm">
                 </div>
             </div>
         </div>
-        <div class="flex gap-2 mt-6">
-            <button onclick="addAccentBox()" class="flex-1 px-4 py-2 bg-indigo-500 text-white rounded-lg">Добавить</button>
-            <button onclick="closeAccentBoxModal()" class="flex-1 px-4 py-2 bg-gray-300 rounded-lg">Отмена</button>
+        <div class="flex gap-2 mt-4">
+            <button id="accentBoxSubmitBtn" onclick="saveAccentBox()" class="flex-1 px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600">Добавить</button>
+            <button onclick="closeAccentBoxModal()" class="flex-1 px-4 py-2 bg-gray-300 rounded-lg hover:bg-gray-400">Отмена</button>
         </div>
     </div>
 </div>
@@ -1053,6 +1162,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (slidePreview) {
         // Use capture phase to intercept clicks before they reach targets
         slidePreview.addEventListener('click', handleSlidePreviewClick, true);
+    }
+    
+    // Setup Tab key for list indentation
+    const editableContent = document.getElementById('editableContent');
+    if (editableContent) {
+        editableContent.addEventListener('keydown', handleEditorKeydown);
     }
     
     // Setup drag-and-drop for slide preview
@@ -1197,6 +1312,11 @@ function loadSlide(index) {
         document.getElementById('gradientPicker').classList.add('hidden');
         document.getElementById('imageBgPicker').classList.add('hidden');
     }
+    
+    // Load text alignment settings
+    const textPosition = slide.textPosition || presentationSettings.defaultTextPosition || { vertical: 'top', horizontal: 'left' };
+    presentationSettings.defaultTextPosition = textPosition;
+    updateAlignmentButtons(textPosition.vertical, textPosition.horizontal);
 
     // Ensure Google Fonts are loaded when switching slides
     changeFontFamily();
@@ -1273,6 +1393,9 @@ function updateSlidePreview() {
     
     // Render tables
     renderPreviewTables();
+    
+    // Render accent boxes
+    renderPreviewAccentBoxes();
 }
 
 function renderPreviewImages() {
@@ -1423,6 +1546,19 @@ function updatePreviewStyles() {
     if (editor) {
         // Apply font family to all content in the editor
         editor.style.fontFamily = fontFamily;
+        
+        // Apply text alignment
+        const textPosition = presentationSettings.defaultTextPosition || { vertical: 'top', horizontal: 'left' };
+        
+        // Horizontal alignment (text-align)
+        const hAlignMap = { left: 'left', center: 'center', right: 'right' };
+        editor.style.textAlign = hAlignMap[textPosition.horizontal] || 'left';
+        
+        // Vertical alignment using flexbox
+        const vAlignMap = { top: 'flex-start', center: 'center', bottom: 'flex-end' };
+        editor.style.display = 'flex';
+        editor.style.flexDirection = 'column';
+        editor.style.justifyContent = vAlignMap[textPosition.vertical] || 'flex-start';
         
         // Also apply font family to all existing elements to ensure consistency
         const allElements = editor.querySelectorAll('*');
@@ -1769,12 +1905,31 @@ function manualSave() {
 // Page orientation control
 function applyPageOrientation() {
     const orientation = document.getElementById('pageOrientation').value;
+    const preview = document.getElementById('slidePreview');
+    
+    // Get old dimensions before changing
+    const oldWidth = preview.offsetWidth;
+    const oldHeight = preview.offsetHeight;
+    
     presentationSettings.pageOrientation = orientation;
     
-    const preview = document.getElementById('slidePreview');
-    if (orientation === 'vertical') {
-        // Portrait: keep height constrained and derive width from aspect ratio
-        preview.style.aspectRatio = '9/16';
+    // Define aspect ratios
+    const aspectRatios = {
+        '16:9': { ratio: '16/9', isVertical: false },
+        '4:3': { ratio: '4/3', isVertical: false },
+        '1:1': { ratio: '1/1', isVertical: false },
+        '9:16': { ratio: '9/16', isVertical: true },
+        // Legacy support
+        'horizontal': { ratio: '16/9', isVertical: false },
+        'vertical': { ratio: '9/16', isVertical: true }
+    };
+    
+    const config = aspectRatios[orientation] || aspectRatios['16:9'];
+    
+    preview.style.aspectRatio = config.ratio;
+    
+    if (config.isVertical) {
+        // Vertical: keep height constrained and derive width from aspect ratio
         preview.style.height = '60vh';
         preview.style.maxHeight = '60vh';
         preview.style.width = 'auto';
@@ -1782,9 +1937,17 @@ function applyPageOrientation() {
         preview.style.display = 'inline-block';
         preview.style.marginLeft = 'auto';
         preview.style.marginRight = 'auto';
+    } else if (orientation === '1:1') {
+        // Square: constrain by height to fit in view
+        preview.style.height = '50vh';
+        preview.style.maxHeight = '50vh';
+        preview.style.width = 'auto';
+        preview.style.maxWidth = '100%';
+        preview.style.display = 'inline-block';
+        preview.style.marginLeft = 'auto';
+        preview.style.marginRight = 'auto';
     } else {
         // Landscape: fill width but cap height
-        preview.style.aspectRatio = '16/9';
         preview.style.height = 'auto';
         preview.style.maxHeight = '60vh';
         preview.style.width = '100%';
@@ -1795,10 +1958,83 @@ function applyPageOrientation() {
     
     saveSettings();
     
-    // Trigger font scaling recalculation after orientation change
+    // After layout settles, adjust element positions to fit new bounds
     setTimeout(() => {
+        const newWidth = preview.offsetWidth;
+        const newHeight = preview.offsetHeight;
+        
+        if (oldWidth > 0 && oldHeight > 0 && newWidth > 0 && newHeight > 0) {
+            adjustElementsToNewBounds(oldWidth, oldHeight, newWidth, newHeight);
+        }
+        
         updatePreviewStyles();
+        renderPreviewImages();
+        renderPreviewTables();
+        renderPreviewAccentBoxes();
     }, 100); // Small delay to allow layout to settle
+}
+
+// Adjust images and accent boxes to fit within new preview bounds
+function adjustElementsToNewBounds(oldWidth, oldHeight, newWidth, newHeight) {
+    const slide = slides[currentSlideIndex];
+    if (!slide) return;
+    
+    const scaleX = newWidth / oldWidth;
+    const scaleY = newHeight / oldHeight;
+    
+    // Adjust images
+    if (slide.images && slide.images.length > 0) {
+        slide.images.forEach(img => {
+            // Scale position
+            img.position.x = Math.round(img.position.x * scaleX);
+            img.position.y = Math.round(img.position.y * scaleY);
+            
+            // Scale size
+            img.size.width = Math.round(img.size.width * scaleX);
+            img.size.height = Math.round(img.size.height * scaleY);
+            
+            // Ensure within bounds
+            img.position.x = Math.max(0, Math.min(img.position.x, newWidth - 50));
+            img.position.y = Math.max(0, Math.min(img.position.y, newHeight - 50));
+        });
+    }
+    
+    // Adjust accent boxes
+    if (slide.accentBoxes && slide.accentBoxes.length > 0) {
+        slide.accentBoxes.forEach(box => {
+            // Scale position
+            box.position.x = Math.round(box.position.x * scaleX);
+            box.position.y = Math.round(box.position.y * scaleY);
+            
+            // Scale size
+            box.size.width = Math.round(box.size.width * scaleX);
+            box.size.height = Math.round(box.size.height * scaleY);
+            
+            // Ensure within bounds
+            box.position.x = Math.max(0, Math.min(box.position.x, newWidth - 50));
+            box.position.y = Math.max(0, Math.min(box.position.y, newHeight - 30));
+        });
+    }
+    
+    // Adjust tables
+    if (slide.tables && slide.tables.length > 0) {
+        slide.tables.forEach(table => {
+            // Scale position
+            table.position.x = Math.round(table.position.x * scaleX);
+            table.position.y = Math.round(table.position.y * scaleY);
+            
+            // Scale column widths
+            if (table.columnWidths) {
+                table.columnWidths = table.columnWidths.map(w => Math.max(30, Math.round(w * scaleX)));
+            }
+            
+            // Ensure within bounds
+            table.position.x = Math.max(0, Math.min(table.position.x, newWidth - 100));
+            table.position.y = Math.max(0, Math.min(table.position.y, newHeight - 50));
+        });
+    }
+    
+    debouncedSave();
 }
 
 // Font selection control
@@ -1830,36 +2066,67 @@ function changeFontFamily() {
     saveSettings();
 }
 
-// Text positioning control
-function changeTextPosition(vertical, horizontal) {
-    if (vertical !== null) {
-        presentationSettings.defaultTextPosition.vertical = vertical;
-        
-        // Update button styles
-        ['posVertTop', 'posVertCenter', 'posVertBottom'].forEach(id => {
-            const btn = document.getElementById(id);
+// Update alignment button styles
+function updateAlignmentButtons(vertical, horizontal) {
+    // Update vertical buttons
+    ['posVertTop', 'posVertCenter', 'posVertBottom'].forEach(id => {
+        const btn = document.getElementById(id);
+        if (btn) {
             btn.classList.remove('bg-blue-100', 'border-blue-500');
             btn.classList.add('hover:bg-gray-50');
-        });
-        document.getElementById('posVert' + vertical.charAt(0).toUpperCase() + vertical.slice(1)).classList.add('bg-blue-100', 'border-blue-500');
+        }
+    });
+    if (vertical) {
+        const vBtnId = 'posVert' + vertical.charAt(0).toUpperCase() + vertical.slice(1);
+        const vBtn = document.getElementById(vBtnId);
+        if (vBtn) {
+            vBtn.classList.add('bg-blue-100', 'border-blue-500');
+            vBtn.classList.remove('hover:bg-gray-50');
+        }
+    }
+    
+    // Update horizontal buttons
+    ['posHorizLeft', 'posHorizCenter', 'posHorizRight'].forEach(id => {
+        const btn = document.getElementById(id);
+        if (btn) {
+            btn.classList.remove('bg-blue-100', 'border-blue-500');
+            btn.classList.add('hover:bg-gray-50');
+        }
+    });
+    if (horizontal) {
+        const hBtnId = horizontal === 'left' ? 'posHorizLeft' : 
+                       horizontal === 'center' ? 'posHorizCenter' : 'posHorizRight';
+        const hBtn = document.getElementById(hBtnId);
+        if (hBtn) {
+            hBtn.classList.add('bg-blue-100', 'border-blue-500');
+            hBtn.classList.remove('hover:bg-gray-50');
+        }
+    }
+}
+
+// Text positioning control
+function changeTextPosition(vertical, horizontal) {
+    // Ensure defaultTextPosition exists
+    if (!presentationSettings.defaultTextPosition) {
+        presentationSettings.defaultTextPosition = { vertical: 'top', horizontal: 'left' };
+    }
+    
+    if (vertical !== null) {
+        presentationSettings.defaultTextPosition.vertical = vertical;
     }
     
     if (horizontal !== null) {
         presentationSettings.defaultTextPosition.horizontal = horizontal;
-        
-        // Update button styles
-        ['posHorizLeft', 'posHorizCenter', 'posHorizRight'].forEach(id => {
-            const btn = document.getElementById(id);
-            btn.classList.remove('bg-blue-100', 'border-blue-500');
-            btn.classList.add('hover:bg-gray-50');
-        });
-        const horizBtnId = horizontal === 'left' ? 'posHorizLeft' : 
-                           horizontal === 'center' ? 'posHorizCenter' : 'posHorizRight';
-        document.getElementById(horizBtnId).classList.add('bg-blue-100', 'border-blue-500');
     }
     
+    // Update button styles
+    updateAlignmentButtons(
+        presentationSettings.defaultTextPosition.vertical,
+        presentationSettings.defaultTextPosition.horizontal
+    );
+    
     updatePreviewStyles();
-    saveSettings();
+    saveCurrentSlide();
 }
 
 // Background control
@@ -1965,6 +2232,9 @@ function handleBackgroundImageUpload(event) {
 
 // Text formatting functions for contenteditable editor
 function formatText(command) {
+    // Restore selection before applying format
+    restoreSelection();
+    
     const selection = window.getSelection();
     if (!selection.rangeCount) return;
     
@@ -1994,11 +2264,36 @@ function formatText(command) {
     }
 }
 
+// Selection preservation for toolbar interactions
+let savedSelection = null;
+
+function saveSelection() {
+    const selection = window.getSelection();
+    if (selection.rangeCount > 0) {
+        savedSelection = selection.getRangeAt(0).cloneRange();
+    }
+}
+
+function restoreSelection() {
+    if (savedSelection) {
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(savedSelection);
+    }
+}
+
 // Apply text color to selected text
 function applyTextColor() {
     const color = document.getElementById('selectionTextColor').value;
+    
+    // Restore selection before applying
+    restoreSelection();
+    
     const selection = window.getSelection();
     if (!selection.rangeCount) return;
+    
+    // Focus editor to ensure execCommand works
+    const editor = document.getElementById('editableContent');
     
     // Check if we're in a table cell
     const range = selection.getRangeAt(0);
@@ -2233,6 +2528,62 @@ function clearAllFormatting() {
     syncContentToData();
 }
 
+// Handle Tab key for list indentation
+function handleEditorKeydown(e) {
+    if (e.key === 'Tab') {
+        e.preventDefault();
+        
+        const editor = document.getElementById('editableContent');
+        const selection = window.getSelection();
+        if (!selection.rangeCount) return;
+        
+        const range = selection.getRangeAt(0);
+        let node = range.commonAncestorContainer;
+        
+        // Check if we're inside a list
+        let listItem = null;
+        while (node && node !== editor) {
+            if (node.tagName === 'LI') {
+                listItem = node;
+                break;
+            }
+            node = node.parentNode;
+        }
+        
+        if (listItem) {
+            // Inside a list - indent or outdent
+            if (e.shiftKey) {
+                // Shift+Tab - outdent
+                document.execCommand('outdent', false, null);
+            } else {
+                // Tab - indent
+                document.execCommand('indent', false, null);
+            }
+        } else {
+            // Not in a list - just insert tab spaces
+            document.execCommand('insertText', false, '    ');
+        }
+        
+        syncContentToData();
+    }
+}
+
+// Indent list item (increase nesting level)
+function indentList() {
+    const editor = document.getElementById('editableContent');
+    editor.focus();
+    document.execCommand('indent', false, null);
+    syncContentToData();
+}
+
+// Outdent list item (decrease nesting level)
+function outdentList() {
+    const editor = document.getElementById('editableContent');
+    editor.focus();
+    document.execCommand('outdent', false, null);
+    syncContentToData();
+}
+
 // Apply format from dropdown (like in Word) - uses execCommand for Ctrl+Z support
 function applyFormat() {
     const formatValue = document.getElementById('formatSelector').value;
@@ -2382,6 +2733,10 @@ function updateFontSizeSlider(element) {
 // Apply font size to selected text
 function applyFontSizeToSelection() {
     const fontSize = document.getElementById('fontSize').value;
+    
+    // Restore selection before applying
+    restoreSelection();
+    
     const selection = window.getSelection();
     
     if (!selection.rangeCount) return;
@@ -3730,45 +4085,203 @@ function updateArrowsList() {
 }
 
 // Accent Box management functions
+let editingAccentBoxId = null;
+let accentFormatState = { bold: false, italic: false, underline: false };
+
+function updateAccentTextPreview() {
+    const textDiv = document.getElementById('accentText');
+    if (!textDiv) return;
+    
+    const fontFamily = document.getElementById('accentFontFamily').value;
+    const fontSize = document.getElementById('accentFontSize').value;
+    const textColor = document.getElementById('accentTextColor').value;
+    const bgColor = document.getElementById('accentBgColor').value;
+    const borderColor = document.getElementById('accentBorderColor').value;
+    
+    textDiv.style.fontFamily = fontFamily + ', sans-serif';
+    textDiv.style.fontSize = fontSize + 'px';
+    textDiv.style.color = textColor;
+    textDiv.style.backgroundColor = bgColor;
+    textDiv.style.borderColor = borderColor;
+}
+
+function toggleAccentFormat(format) {
+    // Apply formatting to selected text using execCommand
+    const textDiv = document.getElementById('accentText');
+    textDiv.focus();
+    
+    const commandMap = {
+        'bold': 'bold',
+        'italic': 'italic',
+        'underline': 'underline'
+    };
+    
+    document.execCommand(commandMap[format], false, null);
+    
+    // Update button state based on current selection
+    updateAccentFormatButtonStates();
+}
+
+function updateAccentFormatButtonStates() {
+    const formats = ['bold', 'italic', 'underline'];
+    formats.forEach(format => {
+        const isActive = document.queryCommandState(format);
+        const btn = document.getElementById('accent' + format.charAt(0).toUpperCase() + format.slice(1));
+        if (btn) {
+            if (isActive) {
+                btn.classList.add('bg-blue-100', 'border-blue-500');
+            } else {
+                btn.classList.remove('bg-blue-100', 'border-blue-500');
+            }
+        }
+    });
+}
+
+function resetAccentFormatButtons() {
+    accentFormatState = { bold: false, italic: false, underline: false };
+    ['Bold', 'Italic', 'Underline'].forEach(format => {
+        const btn = document.getElementById('accent' + format);
+        if (btn) {
+            btn.classList.remove('bg-blue-100', 'border-blue-500');
+        }
+    });
+}
+
+function setAccentFormatButtons(formatting) {
+    accentFormatState = { 
+        bold: formatting?.bold || false, 
+        italic: formatting?.italic || false, 
+        underline: formatting?.underline || false 
+    };
+    ['Bold', 'Italic', 'Underline'].forEach(format => {
+        const btn = document.getElementById('accent' + format);
+        const key = format.toLowerCase();
+        if (btn) {
+            if (accentFormatState[key]) {
+                btn.classList.add('bg-blue-100', 'border-blue-500');
+            } else {
+                btn.classList.remove('bg-blue-100', 'border-blue-500');
+            }
+        }
+    });
+}
+
 function showAccentBoxModal() {
+    // Reset form for new box
+    editingAccentBoxId = null;
+    document.getElementById('accentText').innerHTML = '';
+    document.getElementById('accentX').value = '50';
+    document.getElementById('accentY').value = '200';
+    document.getElementById('accentWidth').value = '300';
+    document.getElementById('accentHeight').value = '100';
+    document.getElementById('accentBgColor').value = '#E0E7FF';
+    document.getElementById('accentBorderColor').value = '#4F46E5';
+    document.getElementById('accentTextColor').value = '#1E1B4B';
+    document.getElementById('accentFontFamily').value = 'Arial';
+    document.getElementById('accentFontSize').value = '14';
+    resetAccentFormatButtons();
+    
+    // Update modal title and button
+    document.getElementById('accentBoxModalTitle').textContent = 'Акцентный блок';
+    document.getElementById('accentBoxSubmitBtn').textContent = 'Добавить';
+    
     document.getElementById('accentBoxModal').classList.remove('hidden');
+    updateAccentTextPreview();
+}
+
+function editAccentBox(boxId) {
+    const boxData = getAccentBoxData(boxId);
+    if (!boxData) return;
+    
+    editingAccentBoxId = boxId;
+    
+    // Populate form with existing data
+    document.getElementById('accentText').innerHTML = boxData.textHtml || boxData.text || '';
+    document.getElementById('accentX').value = boxData.position.x;
+    document.getElementById('accentY').value = boxData.position.y;
+    document.getElementById('accentWidth').value = boxData.size.width;
+    document.getElementById('accentHeight').value = boxData.size.height;
+    document.getElementById('accentBgColor').value = boxData.backgroundColor;
+    document.getElementById('accentBorderColor').value = boxData.borderColor;
+    document.getElementById('accentTextColor').value = boxData.textColor || '#1E1B4B';
+    document.getElementById('accentFontFamily').value = boxData.fontFamily || 'Arial';
+    document.getElementById('accentFontSize').value = boxData.fontSize || 14;
+    resetAccentFormatButtons();
+    
+    // Update modal title and button for edit mode
+    document.getElementById('accentBoxModalTitle').textContent = 'Редактировать блок';
+    document.getElementById('accentBoxSubmitBtn').textContent = 'Сохранить';
+    
+    document.getElementById('accentBoxModal').classList.remove('hidden');
+    updateAccentTextPreview();
 }
 
 function closeAccentBoxModal() {
     document.getElementById('accentBoxModal').classList.add('hidden');
+    editingAccentBoxId = null;
+    resetAccentFormatButtons();
 }
 
-function addAccentBox() {
-    const box = {
-        id: 'accent_' + Date.now(),
-        text: document.getElementById('accentText').value,
-        position: {
-            x: parseInt(document.getElementById('accentX').value),
-            y: parseInt(document.getElementById('accentY').value)
-        },
-        size: {
-            width: parseInt(document.getElementById('accentWidth').value),
-            height: parseInt(document.getElementById('accentHeight').value)
-        },
-        backgroundColor: document.getElementById('accentBgColor').value,
-        borderColor: document.getElementById('accentBorderColor').value,
-        borderWidth: 2,
-        textColor: '#1E1B4B',
-        fontSize: 14
-    };
+function saveAccentBox() {
+    const textDiv = document.getElementById('accentText');
+    const textHtml = textDiv.innerHTML;
+    const textPlain = textDiv.innerText || textDiv.textContent;
     
-    if (!slides[currentSlideIndex].accentBoxes) {
-        slides[currentSlideIndex].accentBoxes = [];
+    if (editingAccentBoxId) {
+        // Update existing box
+        const boxData = getAccentBoxData(editingAccentBoxId);
+        if (boxData) {
+            boxData.text = textPlain;
+            boxData.textHtml = textHtml;
+            boxData.position.x = parseInt(document.getElementById('accentX').value);
+            boxData.position.y = parseInt(document.getElementById('accentY').value);
+            boxData.size.width = parseInt(document.getElementById('accentWidth').value);
+            boxData.size.height = parseInt(document.getElementById('accentHeight').value);
+            boxData.backgroundColor = document.getElementById('accentBgColor').value;
+            boxData.borderColor = document.getElementById('accentBorderColor').value;
+            boxData.textColor = document.getElementById('accentTextColor').value;
+            boxData.fontFamily = document.getElementById('accentFontFamily').value;
+            boxData.fontSize = parseInt(document.getElementById('accentFontSize').value);
+        }
+    } else {
+        // Add new box
+        const box = {
+            id: 'accent_' + Date.now(),
+            text: textPlain,
+            textHtml: textHtml,
+            position: {
+                x: parseInt(document.getElementById('accentX').value),
+                y: parseInt(document.getElementById('accentY').value)
+            },
+            size: {
+                width: parseInt(document.getElementById('accentWidth').value),
+                height: parseInt(document.getElementById('accentHeight').value)
+            },
+            backgroundColor: document.getElementById('accentBgColor').value,
+            borderColor: document.getElementById('accentBorderColor').value,
+            borderWidth: 2,
+            textColor: document.getElementById('accentTextColor').value,
+            fontFamily: document.getElementById('accentFontFamily').value,
+            fontSize: parseInt(document.getElementById('accentFontSize').value)
+        };
+        
+        if (!slides[currentSlideIndex].accentBoxes) {
+            slides[currentSlideIndex].accentBoxes = [];
+        }
+        slides[currentSlideIndex].accentBoxes.push(box);
     }
-    slides[currentSlideIndex].accentBoxes.push(box);
     
     updateAccentBoxesList();
+    renderPreviewAccentBoxes();
     closeAccentBoxModal();
+    debouncedSave();
 }
 
 function removeAccentBox(boxId) {
     slides[currentSlideIndex].accentBoxes = slides[currentSlideIndex].accentBoxes.filter(box => box.id !== boxId);
     updateAccentBoxesList();
+    renderPreviewAccentBoxes();
+    debouncedSave();
 }
 
 function updateAccentBoxesList() {
@@ -3780,12 +4293,225 @@ function updateAccentBoxesList() {
         return;
     }
     
-    container.innerHTML = boxes.map(box => `
-        <div class="flex items-center justify-between p-2 bg-gray-50 rounded text-xs">
-            <span>Блок: ${box.text.substring(0, 20)}${box.text.length > 20 ? '...' : ''}</span>
-            <button onclick="removeAccentBox('${box.id}')" class="text-red-500 hover:text-red-700 ml-2">✕</button>
-        </div>
-    `).join('');
+    container.innerHTML = boxes.map(box => {
+        const plainText = box.text || '';
+        const preview = plainText.substring(0, 20);
+        return `
+            <div class="flex items-center justify-between p-2 bg-gray-50 rounded text-xs">
+                <span>Блок: ${preview}${plainText.length > 20 ? '...' : ''}</span>
+                <button onclick="removeAccentBox('${box.id}')" class="text-red-500 hover:text-red-700 ml-2">✕</button>
+            </div>
+        `;
+    }).join('');
+}
+
+// Render accent boxes on preview
+function renderPreviewAccentBoxes() {
+    const boxes = slides[currentSlideIndex].accentBoxes || [];
+    const container = document.getElementById('previewAccentBoxes');
+    
+    // Clear existing boxes
+    container.innerHTML = '';
+    
+    // Render all accent boxes
+    boxes.forEach(box => {
+        const wrapper = createAccentBoxWrapper(box);
+        container.appendChild(wrapper);
+    });
+    
+    // Initialize Interact.js on all new accent box wrappers
+    setTimeout(() => {
+        if (typeof interact !== 'undefined') {
+            initializeAccentBoxInteractions();
+        }
+    }, 50);
+}
+
+function createAccentBoxWrapper(boxData) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'accent-box-wrapper';
+    wrapper.dataset.boxId = boxData.id;
+    wrapper.style.cssText = `
+        position: absolute;
+        left: ${boxData.position.x}px;
+        top: ${boxData.position.y}px;
+        width: ${boxData.size.width}px;
+        height: ${boxData.size.height}px;
+        background-color: ${boxData.backgroundColor};
+        border: ${boxData.borderWidth || 2}px solid ${boxData.borderColor};
+        border-radius: 8px;
+        cursor: move;
+        pointer-events: auto;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 8px;
+        box-sizing: border-box;
+        overflow: hidden;
+    `;
+    
+    // Text content
+    const textEl = document.createElement('div');
+    textEl.style.cssText = `
+        color: ${boxData.textColor || '#1E1B4B'};
+        font-size: ${boxData.fontSize || 14}px;
+        font-family: ${boxData.fontFamily || 'Arial'}, sans-serif;
+        line-height: 1.3;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+    `;
+    // Use HTML content if available, otherwise plain text
+    if (boxData.textHtml) {
+        textEl.innerHTML = boxData.textHtml;
+    } else {
+        textEl.textContent = boxData.text;
+    }
+    wrapper.appendChild(textEl);
+    
+    // Delete button
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'accent-box-delete';
+    deleteBtn.innerHTML = '✕';
+    deleteBtn.style.cssText = `
+        position: absolute;
+        top: -8px;
+        right: -8px;
+        width: 20px;
+        height: 20px;
+        background: #ef4444;
+        color: white;
+        border: none;
+        border-radius: 50%;
+        cursor: pointer;
+        font-size: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        transition: opacity 0.2s;
+    `;
+    deleteBtn.onclick = (e) => {
+        e.stopPropagation();
+        removeAccentBox(boxData.id);
+        renderPreviewAccentBoxes();
+        debouncedSave();
+    };
+    wrapper.appendChild(deleteBtn);
+    
+    // Show delete on hover
+    wrapper.addEventListener('mouseenter', () => {
+        deleteBtn.style.opacity = '1';
+    });
+    wrapper.addEventListener('mouseleave', () => {
+        deleteBtn.style.opacity = '0';
+    });
+    
+    // Click to select
+    wrapper.onclick = function(e) {
+        e.stopPropagation();
+        selectAccentBox(boxData.id);
+    };
+    
+    // Double-click to edit
+    wrapper.ondblclick = function(e) {
+        e.stopPropagation();
+        editAccentBox(boxData.id);
+    };
+    
+    return wrapper;
+}
+
+let selectedAccentBoxId = null;
+
+function selectAccentBox(boxId) {
+    deselectAllAccentBoxes();
+    deselectAllImages();
+    deselectAllTables();
+    
+    const wrapper = document.querySelector(`.accent-box-wrapper[data-box-id="${boxId}"]`);
+    if (wrapper) {
+        wrapper.classList.add('selected');
+        wrapper.style.outline = '2px solid #8B5CF6';
+        wrapper.style.outlineOffset = '2px';
+        selectedAccentBoxId = boxId;
+    }
+}
+
+function deselectAllAccentBoxes() {
+    document.querySelectorAll('.accent-box-wrapper.selected').forEach(el => {
+        el.classList.remove('selected');
+        el.style.outline = '';
+        el.style.outlineOffset = '';
+    });
+    selectedAccentBoxId = null;
+}
+
+function getAccentBoxData(boxId) {
+    const boxes = slides[currentSlideIndex].accentBoxes || [];
+    return boxes.find(b => b.id === boxId);
+}
+
+function initializeAccentBoxInteractions() {
+    interact('.accent-box-wrapper').draggable({
+        inertia: false,
+        modifiers: [
+            interact.modifiers.restrictRect({
+                restriction: 'parent',
+                endOnly: false
+            })
+        ],
+        listeners: {
+            move(event) {
+                const target = event.target;
+                const boxId = target.dataset.boxId;
+                const boxData = getAccentBoxData(boxId);
+                if (!boxData) return;
+                
+                boxData.position.x += event.dx;
+                boxData.position.y += event.dy;
+                
+                target.style.left = `${boxData.position.x}px`;
+                target.style.top = `${boxData.position.y}px`;
+            },
+            end() {
+                debouncedSave();
+            }
+        }
+    }).resizable({
+        edges: { left: true, right: true, bottom: true, top: true },
+        listeners: {
+            move(event) {
+                const target = event.target;
+                const boxId = target.dataset.boxId;
+                const boxData = getAccentBoxData(boxId);
+                if (!boxData) return;
+                
+                let { x, y } = boxData.position;
+                
+                x += event.deltaRect.left;
+                y += event.deltaRect.top;
+                
+                boxData.position.x = x;
+                boxData.position.y = y;
+                boxData.size.width = Math.max(50, event.rect.width);
+                boxData.size.height = Math.max(30, event.rect.height);
+                
+                target.style.left = `${x}px`;
+                target.style.top = `${y}px`;
+                target.style.width = `${boxData.size.width}px`;
+                target.style.height = `${boxData.size.height}px`;
+            },
+            end() {
+                debouncedSave();
+            }
+        },
+        modifiers: [
+            interact.modifiers.restrictSize({
+                min: { width: 50, height: 30 }
+            })
+        ]
+    });
 }
 
 // Drag and drop setup for slide preview

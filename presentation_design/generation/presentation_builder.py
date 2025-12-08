@@ -65,19 +65,26 @@ class PresentationBuilder:
             if settings is None:
                 settings = {}
             
-            page_orientation = settings.get('pageOrientation', 'horizontal')
+            page_orientation = settings.get('pageOrientation', '16:9')
             
-            # Define page size based on orientation
-            if page_orientation == 'vertical':
-                page_size = {
-                    'width': {'magnitude': 5143500, 'unit': 'EMU'},
-                    'height': {'magnitude': 9144000, 'unit': 'EMU'}
-                }
-            else:
-                page_size = {
-                    'width': {'magnitude': 9144000, 'unit': 'EMU'},
-                    'height': {'magnitude': 5143500, 'unit': 'EMU'}
-                }
+            # Define page size based on aspect ratio
+            # Google Slides uses EMU (English Metric Units)
+            # 1 inch = 914400 EMU, standard slide is 10" x 7.5" for 4:3
+            page_sizes = {
+                '16:9': {'width': 9144000, 'height': 5143500},  # 10" x 5.625"
+                '4:3': {'width': 9144000, 'height': 6858000},   # 10" x 7.5"
+                '1:1': {'width': 6858000, 'height': 6858000},   # 7.5" x 7.5"
+                '9:16': {'width': 5143500, 'height': 9144000},  # 5.625" x 10"
+                # Legacy support
+                'horizontal': {'width': 9144000, 'height': 5143500},
+                'vertical': {'width': 5143500, 'height': 9144000}
+            }
+            
+            size = page_sizes.get(page_orientation, page_sizes['16:9'])
+            page_size = {
+                'width': {'magnitude': size['width'], 'unit': 'EMU'},
+                'height': {'magnitude': size['height'], 'unit': 'EMU'}
+            }
             
             # Create blank presentation with custom page size
             presentation = self.slides_service.presentations().create(
