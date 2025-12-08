@@ -247,6 +247,175 @@
     display: flex;
 }
 
+/* Table Wrapper Styles */
+.table-wrapper {
+    position: absolute;
+    cursor: move;
+    pointer-events: auto;
+    background: #f9fafb;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    overflow: visible;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    padding: 6px;
+}
+
+.table-wrapper.selected {
+    outline: 2px solid #8B5CF6;
+    outline-offset: 2px;
+}
+
+.table-wrapper table {
+    width: 100%;
+    height: auto;
+    border-collapse: collapse;
+    table-layout: fixed;
+    font-size: 12px;
+    line-height: 1.2;
+    background: white;
+}
+
+.table-wrapper th,
+.table-wrapper td {
+    border: 1px solid #d1d5db;
+    padding: 1px 3px;
+    text-align: left;
+    overflow: hidden;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    word-break: break-word;
+    vertical-align: top;
+    cursor: text;
+    height: auto;
+    line-height: 1.2;
+    outline: none;
+}
+
+.table-wrapper th:focus,
+.table-wrapper td:focus {
+    cursor: text;
+    outline: 2px solid #8B5CF6;
+    outline-offset: -2px;
+    background: #faf5ff;
+}
+
+/* Editable cell placeholder */
+.table-wrapper td:empty::before,
+.table-wrapper th:empty::before {
+    content: '';
+    display: inline-block;
+    min-height: 0.5em;
+}
+
+.table-wrapper th {
+    background: #f3f4f6;
+    font-weight: 600;
+}
+
+.table-wrapper .resize-handle {
+    border-color: #8B5CF6;
+}
+
+.table-wrapper.selected .resize-handle {
+    display: block;
+}
+
+.table-wrapper.dragging {
+    cursor: move !important;
+    opacity: 0.8;
+}
+
+.table-wrapper.resizing {
+    opacity: 0.8;
+}
+
+/* Column resize handles for table wrapper */
+.table-wrapper .col-resize-handle {
+    position: absolute;
+    top: 6px;
+    width: 6px;
+    height: calc(100% - 12px);
+    cursor: col-resize;
+    background: transparent;
+    z-index: 10;
+}
+
+.table-wrapper .col-resize-handle:hover {
+    background: rgba(139, 92, 246, 0.3);
+}
+
+.table-wrapper .col-resize-handle.resizing {
+    background: rgba(139, 92, 246, 0.5);
+}
+
+/* Edge resize handles for table */
+.table-wrapper .edge-resize-handle {
+    position: absolute;
+    top: 6px;
+    width: 6px;
+    height: calc(100% - 12px);
+    cursor: ew-resize;
+    background: transparent;
+    z-index: 11;
+}
+
+.table-wrapper .edge-resize-handle.left {
+    left: 0;
+}
+
+.table-wrapper .edge-resize-handle.right {
+    right: 0;
+}
+
+.table-wrapper .edge-resize-handle:hover {
+    background: rgba(59, 130, 246, 0.3);
+}
+
+.table-wrapper .edge-resize-handle.resizing {
+    background: rgba(59, 130, 246, 0.5);
+}
+
+/* Corner resize handles for table */
+.table-wrapper .corner-resize-handle {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    background: #8B5CF6;
+    border: 1px solid white;
+    border-radius: 2px;
+    z-index: 12;
+    cursor: nwse-resize;
+}
+
+.table-wrapper .corner-resize-handle.top-left {
+    top: -3px;
+    left: -3px;
+    cursor: nwse-resize;
+}
+
+.table-wrapper .corner-resize-handle.top-right {
+    top: -3px;
+    right: -3px;
+    cursor: nesw-resize;
+}
+
+.table-wrapper .corner-resize-handle.bottom-left {
+    bottom: -3px;
+    left: -3px;
+    cursor: nesw-resize;
+}
+
+.table-wrapper .corner-resize-handle.bottom-right {
+    bottom: -3px;
+    right: -3px;
+    cursor: nwse-resize;
+}
+
+.table-wrapper .corner-resize-handle:hover {
+    background: #7C3AED;
+    transform: scale(1.2);
+}
+
 /* Full-screen layout styles */
 .fullscreen-container {
     width: 100%;
@@ -436,6 +605,8 @@
                     </div>
                     <!-- Images layer (on top but only images are clickable) -->
                     <div id="previewImages" class="absolute inset-0" style="z-index: 20; pointer-events: none;"></div>
+                    <!-- Tables layer -->
+                    <div id="previewTables" class="absolute inset-0" style="z-index: 15; pointer-events: none;"></div>
                 </div>
                 
                 <!-- Dimension Tooltip -->
@@ -702,7 +873,21 @@
 <!-- Table Cell Editor Modal -->
 <div id="tableCellEditorModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
     <div class="bg-white rounded-lg p-6 max-w-4xl w-full max-h-[80vh] overflow-y-auto">
-        <h3 class="text-lg font-bold mb-4">Редактирование ячеек таблицы</h3>
+        <h3 class="text-lg font-bold mb-4">Редактирование таблицы</h3>
+        
+        <!-- Add Row/Column Buttons -->
+        <div class="flex gap-2 mb-4 flex-wrap">
+            <button onclick="addTableRow()" class="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600">
+                + Строка
+            </button>
+            <button onclick="addTableColumn()" class="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600">
+                + Столбец
+            </button>
+            <span class="border-l mx-1"></span>
+            <span id="tableDimensions" class="text-sm text-gray-600 self-center"></span>
+            <span class="ml-auto text-xs text-gray-500 self-center">Кликните на ✕ чтобы удалить строку/столбец</span>
+        </div>
+        
         <div id="tableCellGrid" class="space-y-2 mb-4">
             <!-- Cell grid will be dynamically generated -->
         </div>
@@ -1059,6 +1244,7 @@ function updateSlidePreview() {
     // 1. Apply styles
     // 2. Apply background
     // 3. Render images
+    // 4. Render tables
     
     updatePreviewStyles();
     
@@ -1084,6 +1270,9 @@ function updateSlidePreview() {
     
     // Render images in layers
     renderPreviewImages();
+    
+    // Render tables
+    renderPreviewTables();
 }
 
 function renderPreviewImages() {
@@ -1776,28 +1965,62 @@ function handleBackgroundImageUpload(event) {
 
 // Text formatting functions for contenteditable editor
 function formatText(command) {
-    // Focus the editable content
-    const editor = document.getElementById('editableContent');
-    editor.focus();
+    const selection = window.getSelection();
+    if (!selection.rangeCount) return;
     
-    // Execute the formatting command
-    document.execCommand(command, false, null);
+    // Check if we're in a table cell
+    const range = selection.getRangeAt(0);
+    let node = range.commonAncestorContainer;
+    let tableCell = null;
     
-    // Sync to data
-    syncContentToData();
+    while (node && node.nodeType !== Node.DOCUMENT_NODE) {
+        if (node.tagName === 'TH' || node.tagName === 'TD') {
+            tableCell = node;
+            break;
+        }
+        node = node.parentNode;
+    }
+    
+    if (tableCell) {
+        // We're in a table cell - format works directly
+        document.execCommand(command, false, null);
+        syncCellToData(tableCell);
+    } else {
+        // Normal editor content
+        const editor = document.getElementById('editableContent');
+        editor.focus();
+        document.execCommand(command, false, null);
+        syncContentToData();
+    }
 }
 
 // Apply text color to selected text
 function applyTextColor() {
     const color = document.getElementById('selectionTextColor').value;
-    const editor = document.getElementById('editableContent');
-    editor.focus();
+    const selection = window.getSelection();
+    if (!selection.rangeCount) return;
+    
+    // Check if we're in a table cell
+    const range = selection.getRangeAt(0);
+    let node = range.commonAncestorContainer;
+    let tableCell = null;
+    
+    while (node && node.nodeType !== Node.DOCUMENT_NODE) {
+        if (node.tagName === 'TH' || node.tagName === 'TD') {
+            tableCell = node;
+            break;
+        }
+        node = node.parentNode;
+    }
     
     // Apply color to selected text using foreColor command
     document.execCommand('foreColor', false, color);
     
-    // Sync to data
-    syncContentToData();
+    if (tableCell) {
+        syncCellToData(tableCell);
+    } else {
+        syncContentToData();
+    }
 }
 
 // Toggle list - only selected text becomes list item
@@ -2159,22 +2382,39 @@ function updateFontSizeSlider(element) {
 // Apply font size to selected text
 function applyFontSizeToSelection() {
     const fontSize = document.getElementById('fontSize').value;
-    const editor = document.getElementById('editableContent');
     const selection = window.getSelection();
     
     if (!selection.rangeCount) return;
     
     const range = selection.getRangeAt(0);
     
+    // Check if we're in a table cell
+    let node = range.commonAncestorContainer;
+    let tableCell = null;
+    let container = null;
+    
+    while (node && node.nodeType !== Node.DOCUMENT_NODE) {
+        if (node.tagName === 'TH' || node.tagName === 'TD') {
+            tableCell = node;
+            container = tableCell;
+            break;
+        }
+        if (node.id === 'editableContent') {
+            container = node;
+            break;
+        }
+        node = node.parentNode;
+    }
+    
+    if (!container) return;
+    
     // If text is selected, apply size
     if (!range.collapsed) {
-        editor.focus();
-        
         // Use execCommand to apply font size
         document.execCommand('fontSize', false, '7'); // Use a value that we'll override
         
         // Find and update all font elements that were just created
-        const fontElements = editor.querySelectorAll('font[size="7"]');
+        const fontElements = container.querySelectorAll('font[size="7"]');
         fontElements.forEach(font => {
             font.removeAttribute('size');
             font.style.fontSize = fontSize + 'px';
@@ -2184,23 +2424,33 @@ function applyFontSizeToSelection() {
         const selectedElement = range.commonAncestorContainer;
         if (selectedElement.nodeType === Node.ELEMENT_NODE) {
             selectedElement.style.fontSize = fontSize + 'px';
-        } else if (selectedElement.parentElement) {
+        } else if (selectedElement.parentElement && selectedElement.parentElement !== container) {
             selectedElement.parentElement.style.fontSize = fontSize + 'px';
         }
         
-        syncContentToData();
+        if (tableCell) {
+            syncCellToData(tableCell);
+        } else {
+            syncContentToData();
+        }
     } else {
-        // No selection - find current block and update it
-        let node = range.startContainer;
-        while (node && node !== editor) {
-            if (node.nodeType === Node.ELEMENT_NODE && 
-                (node.tagName === 'H1' || node.tagName === 'H2' || node.tagName === 'H3' || 
-                 node.tagName === 'H4' || node.tagName === 'P')) {
-                node.style.fontSize = fontSize + 'px';
-                syncContentToData();
-                break;
+        // No selection - apply to current block or cell
+        if (tableCell) {
+            tableCell.style.fontSize = fontSize + 'px';
+            syncCellToData(tableCell);
+        } else {
+            let node = range.startContainer;
+            const editor = document.getElementById('editableContent');
+            while (node && node !== editor) {
+                if (node.nodeType === Node.ELEMENT_NODE && 
+                    (node.tagName === 'H1' || node.tagName === 'H2' || node.tagName === 'H3' || 
+                     node.tagName === 'H4' || node.tagName === 'P')) {
+                    node.style.fontSize = fontSize + 'px';
+                    syncContentToData();
+                    break;
+                }
+                node = node.parentNode;
             }
-            node = node.parentNode;
         }
     }
 }
@@ -2435,18 +2685,29 @@ function closeTableModal() {
 }
 
 function addTable() {
+    const columns = parseInt(document.getElementById('tableColumns').value);
+    const width = parseInt(document.getElementById('tableWidth').value);
+    
+    // Initialize column widths (equal distribution)
+    const defaultColWidth = Math.floor(width / columns);
+    const columnWidths = [];
+    for (let i = 0; i < columns; i++) {
+        columnWidths.push(defaultColWidth);
+    }
+    
     const table = {
         id: 'tbl_' + Date.now(),
         rows: parseInt(document.getElementById('tableRows').value),
-        columns: parseInt(document.getElementById('tableColumns').value),
+        columns: columns,
         position: {
             x: parseInt(document.getElementById('tableX').value),
             y: parseInt(document.getElementById('tableY').value)
         },
         size: {
-            width: parseInt(document.getElementById('tableWidth').value),
+            width: width,
             height: parseInt(document.getElementById('tableHeight').value)
         },
+        columnWidths: columnWidths,
         cellData: {}
     };
     
@@ -2465,19 +2726,53 @@ function editTableCells(tableId) {
     const table = slides[currentSlideIndex].tables.find(t => t.id === tableId);
     if (!table) return;
     
+    // Update dimensions display
+    document.getElementById('tableDimensions').textContent = `${table.rows} x ${table.columns}`;
+    
     // Generate cell grid
+    regenerateCellGrid();
+    
+    document.getElementById('tableCellEditorModal').classList.remove('hidden');
+}
+
+function regenerateCellGrid() {
+    const table = slides[currentSlideIndex].tables.find(t => t.id === currentEditingTableId);
+    if (!table) return;
+    
     const grid = document.getElementById('tableCellGrid');
     let html = '<div class="overflow-x-auto"><table class="w-full border-collapse border">';
     
+    // Header row with column delete buttons
+    html += '<tr>';
+    html += '<th class="border p-1 bg-gray-100 w-10"></th>'; // Empty corner cell
+    for (let col = 0; col < table.columns; col++) {
+        html += `<th class="border p-1 bg-gray-100 text-center">
+            <div class="flex items-center justify-center gap-1">
+                <span class="text-xs text-gray-500">С${col + 1}</span>
+                ${table.columns > 1 ? `<button onclick="removeTableColumnAt(${col})" class="text-red-500 hover:text-red-700 text-xs" title="Удалить столбец ${col + 1}">✕</button>` : ''}
+            </div>
+        </th>`;
+    }
+    html += '</tr>';
+    
+    // Data rows with row delete buttons
     for (let row = 0; row < table.rows; row++) {
         html += '<tr>';
+        // Row header with delete button
+        html += `<td class="border p-1 bg-gray-100 text-center">
+            <div class="flex items-center justify-center gap-1">
+                <span class="text-xs text-gray-500">Р${row + 1}</span>
+                ${table.rows > 1 ? `<button onclick="removeTableRowAt(${row})" class="text-red-500 hover:text-red-700 text-xs" title="Удалить строку ${row + 1}">✕</button>` : ''}
+            </div>
+        </td>`;
         for (let col = 0; col < table.columns; col++) {
             const cellKey = `${row}_${col}`;
             const cellValue = table.cellData[cellKey] || '';
+            const escapedValue = cellValue.replace(/"/g, '&quot;');
             html += `<td class="border p-1">
                 <input type="text" 
                        id="cell_${cellKey}" 
-                       value="${cellValue}" 
+                       value="${escapedValue}" 
                        class="w-full p-2 border rounded text-sm" 
                        placeholder="R${row+1}C${col+1}">
             </td>`;
@@ -2487,7 +2782,165 @@ function editTableCells(tableId) {
     html += '</table></div>';
     grid.innerHTML = html;
     
-    document.getElementById('tableCellEditorModal').classList.remove('hidden');
+    // Update dimensions display
+    document.getElementById('tableDimensions').textContent = `${table.rows} x ${table.columns}`;
+}
+
+function addTableRow() {
+    const table = slides[currentSlideIndex].tables.find(t => t.id === currentEditingTableId);
+    if (!table) return;
+    
+    // Save current cell data first
+    saveCellDataTemporary();
+    
+    // Add new row
+    table.rows++;
+    
+    // Initialize new row cells
+    for (let col = 0; col < table.columns; col++) {
+        const cellKey = `${table.rows - 1}_${col}`;
+        table.cellData[cellKey] = '';
+    }
+    
+    // Regenerate the grid
+    regenerateCellGrid();
+}
+
+function addTableColumn() {
+    const table = slides[currentSlideIndex].tables.find(t => t.id === currentEditingTableId);
+    if (!table) return;
+    
+    // Save current cell data first
+    saveCellDataTemporary();
+    
+    // Add new column
+    table.columns++;
+    
+    // Add column width (take from last column or default)
+    const newColWidth = table.columnWidths && table.columnWidths.length > 0 
+        ? table.columnWidths[table.columnWidths.length - 1] 
+        : 100;
+    if (!table.columnWidths) table.columnWidths = [];
+    table.columnWidths.push(newColWidth);
+    
+    // Update table total width
+    table.size.width += newColWidth;
+    
+    // Initialize new column cells
+    for (let row = 0; row < table.rows; row++) {
+        const cellKey = `${row}_${table.columns - 1}`;
+        table.cellData[cellKey] = '';
+    }
+    
+    // Regenerate the grid
+    regenerateCellGrid();
+}
+
+function removeTableRow() {
+    // Legacy function - remove last row
+    removeTableRowAt(-1);
+}
+
+function removeTableRowAt(rowIndex) {
+    const table = slides[currentSlideIndex].tables.find(t => t.id === currentEditingTableId);
+    if (!table || table.rows <= 1) {
+        alert('Нельзя удалить последнюю строку!');
+        return;
+    }
+    
+    // If -1, remove last row
+    if (rowIndex === -1) rowIndex = table.rows - 1;
+    
+    // Save current cell data first
+    saveCellDataTemporary();
+    
+    // Shift all rows after the deleted one up
+    const newCellData = {};
+    for (let row = 0; row < table.rows; row++) {
+        for (let col = 0; col < table.columns; col++) {
+            const oldKey = `${row}_${col}`;
+            if (row < rowIndex) {
+                // Keep rows before the deleted one
+                newCellData[oldKey] = table.cellData[oldKey] || '';
+            } else if (row > rowIndex) {
+                // Shift rows after the deleted one
+                const newKey = `${row - 1}_${col}`;
+                newCellData[newKey] = table.cellData[oldKey] || '';
+            }
+            // Skip the deleted row
+        }
+    }
+    
+    table.cellData = newCellData;
+    table.rows--;
+    
+    // Regenerate the grid
+    regenerateCellGrid();
+}
+
+function removeTableColumn() {
+    // Legacy function - remove last column
+    removeTableColumnAt(-1);
+}
+
+function removeTableColumnAt(colIndex) {
+    const table = slides[currentSlideIndex].tables.find(t => t.id === currentEditingTableId);
+    if (!table || table.columns <= 1) {
+        alert('Нельзя удалить последний столбец!');
+        return;
+    }
+    
+    // If -1, remove last column
+    if (colIndex === -1) colIndex = table.columns - 1;
+    
+    // Save current cell data first
+    saveCellDataTemporary();
+    
+    // Remove column width and update table width
+    if (table.columnWidths && table.columnWidths.length > colIndex) {
+        const removedWidth = table.columnWidths[colIndex];
+        table.columnWidths.splice(colIndex, 1);
+        table.size.width -= removedWidth;
+    }
+    
+    // Shift all columns after the deleted one left
+    const newCellData = {};
+    for (let row = 0; row < table.rows; row++) {
+        for (let col = 0; col < table.columns; col++) {
+            const oldKey = `${row}_${col}`;
+            if (col < colIndex) {
+                // Keep columns before the deleted one
+                newCellData[oldKey] = table.cellData[oldKey] || '';
+            } else if (col > colIndex) {
+                // Shift columns after the deleted one
+                const newKey = `${row}_${col - 1}`;
+                newCellData[newKey] = table.cellData[oldKey] || '';
+            }
+            // Skip the deleted column
+        }
+    }
+    
+    table.cellData = newCellData;
+    table.columns--;
+    
+    // Regenerate the grid
+    regenerateCellGrid();
+}
+
+function saveCellDataTemporary() {
+    const table = slides[currentSlideIndex].tables.find(t => t.id === currentEditingTableId);
+    if (!table) return;
+    
+    // Collect cell data from inputs
+    for (let row = 0; row < table.rows; row++) {
+        for (let col = 0; col < table.columns; col++) {
+            const cellKey = `${row}_${col}`;
+            const input = document.getElementById(`cell_${cellKey}`);
+            if (input) {
+                table.cellData[cellKey] = input.value;
+            }
+        }
+    }
 }
 
 function saveCellData() {
@@ -2507,6 +2960,8 @@ function saveCellData() {
     
     closeCellEditor();
     updateTablesList();
+    renderPreviewTables();
+    saveSlides();
 }
 
 function closeCellEditor() {
@@ -2517,6 +2972,8 @@ function closeCellEditor() {
 function removeTable(tableId) {
     slides[currentSlideIndex].tables = slides[currentSlideIndex].tables.filter(tbl => tbl.id !== tableId);
     updateTablesList();
+    renderPreviewTables();
+    saveSlides();
 }
 
 function updateTablesList() {
@@ -2537,6 +2994,683 @@ function updateTablesList() {
             </div>
         </div>
     `).join('');
+    
+    // Re-render tables on preview
+    renderPreviewTables();
+}
+
+// Table rendering functions
+let selectedTableId = null;
+
+function renderPreviewTables() {
+    const tables = slides[currentSlideIndex].tables || [];
+    const tablesContainer = document.getElementById('previewTables');
+    
+    // Clear existing tables
+    tablesContainer.innerHTML = '';
+    
+    // Deselect all tables when re-rendering
+    deselectAllTables();
+    
+    // Render all tables
+    tables.forEach(tbl => {
+        const wrapper = createTableWrapper(tbl);
+        tablesContainer.appendChild(wrapper);
+    });
+    
+    // Initialize Interact.js on all new table wrappers
+    setTimeout(() => {
+        if (typeof interact !== 'undefined') {
+            initializeTableInteractions();
+        }
+    }, 50);
+}
+
+function createTableWrapper(tableData) {
+    // Create wrapper div
+    const wrapper = document.createElement('div');
+    wrapper.className = 'table-wrapper';
+    wrapper.dataset.tableId = tableData.id;
+    wrapper.style.left = `${tableData.position.x}px`;
+    wrapper.style.top = `${tableData.position.y}px`;
+    
+    // Initialize column widths if not present
+    if (!tableData.columnWidths || tableData.columnWidths.length !== tableData.columns) {
+        const defaultColWidth = Math.floor(tableData.size.width / tableData.columns);
+        tableData.columnWidths = [];
+        for (let i = 0; i < tableData.columns; i++) {
+            tableData.columnWidths.push(defaultColWidth);
+        }
+    }
+    
+    // Calculate total width from column widths
+    const totalWidth = tableData.columnWidths.reduce((sum, w) => sum + w, 0);
+    wrapper.style.width = `${totalWidth + 12}px`; // +12 for padding (6px on each side)
+    wrapper.style.height = 'auto';
+    wrapper.style.pointerEvents = 'auto';
+    
+    // Create table element
+    const tableEl = document.createElement('table');
+    
+    // Create colgroup for column widths
+    const colgroup = document.createElement('colgroup');
+    for (let col = 0; col < tableData.columns; col++) {
+        const colEl = document.createElement('col');
+        colEl.style.width = `${tableData.columnWidths[col]}px`;
+        colEl.dataset.colIndex = col;
+        colgroup.appendChild(colEl);
+    }
+    tableEl.appendChild(colgroup);
+    
+    for (let row = 0; row < tableData.rows; row++) {
+        const tr = document.createElement('tr');
+        for (let col = 0; col < tableData.columns; col++) {
+            const td = row === 0 ? document.createElement('th') : document.createElement('td');
+            const cellKey = `${row}_${col}`;
+            
+            // Make cell editable
+            td.contentEditable = 'true';
+            td.dataset.row = row;
+            td.dataset.col = col;
+            td.dataset.tableId = tableData.id;
+            
+            // Set cell content (supports HTML formatting)
+            const cellContent = tableData.cellData[cellKey] || '';
+            // Check if it's HTML or plain text
+            if (cellContent.includes('<') && cellContent.includes('>')) {
+                td.innerHTML = cellContent;
+            } else {
+                td.innerHTML = cellContent.replace(/\n/g, '<br>');
+            }
+            
+            // Handle input - sync to data
+            td.addEventListener('input', (e) => {
+                syncCellToData(e.target);
+            });
+            
+            // Handle keydown for Enter
+            td.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    // Allow default Enter behavior for line break
+                    // Shift+Enter or just Enter both add line break
+                } else if (e.key === 'Tab') {
+                    e.preventDefault();
+                    // Move to next/previous cell
+                    navigateTableCell(e.target, e.shiftKey ? -1 : 1);
+                } else if (e.key === 'Escape') {
+                    e.target.blur();
+                }
+            });
+            
+            // Prevent table drag when editing
+            td.addEventListener('mousedown', (e) => {
+                e.stopPropagation();
+            });
+            
+            tr.appendChild(td);
+        }
+        tableEl.appendChild(tr);
+    }
+    
+    wrapper.appendChild(tableEl);
+    
+    // Apply saved font size if set
+    if (tableData.fontSize && tableData.fontSize !== 12) {
+        tableEl.style.fontSize = `${tableData.fontSize}px`;
+    }
+    
+    // Create column resize handles (between columns)
+    let xOffset = 6; // Start after left padding
+    for (let col = 0; col < tableData.columns - 1; col++) {
+        xOffset += tableData.columnWidths[col];
+        const colHandle = document.createElement('div');
+        colHandle.className = 'col-resize-handle';
+        colHandle.dataset.colIndex = col;
+        colHandle.style.left = `${xOffset + 3}px`; // center on column edge
+        
+        // Add mouse events for column resizing
+        colHandle.addEventListener('mousedown', (e) => {
+            e.stopPropagation();
+            startColumnResize(e, tableData.id, col);
+        });
+        
+        wrapper.appendChild(colHandle);
+    }
+    
+    // Create edge resize handles (left and right edges)
+    const leftEdge = document.createElement('div');
+    leftEdge.className = 'edge-resize-handle left';
+    leftEdge.addEventListener('mousedown', (e) => {
+        e.stopPropagation();
+        startEdgeResize(e, tableData.id, 'left');
+    });
+    wrapper.appendChild(leftEdge);
+    
+    const rightEdge = document.createElement('div');
+    rightEdge.className = 'edge-resize-handle right';
+    rightEdge.addEventListener('mousedown', (e) => {
+        e.stopPropagation();
+        startEdgeResize(e, tableData.id, 'right');
+    });
+    wrapper.appendChild(rightEdge);
+    
+    // Create corner resize handles
+    const corners = ['top-left', 'top-right', 'bottom-left', 'bottom-right'];
+    corners.forEach(corner => {
+        const cornerHandle = document.createElement('div');
+        cornerHandle.className = `corner-resize-handle ${corner}`;
+        cornerHandle.addEventListener('mousedown', (e) => {
+            e.stopPropagation();
+            startCornerResize(e, tableData.id, corner);
+        });
+        wrapper.appendChild(cornerHandle);
+    });
+    
+    // Click to select
+    wrapper.onclick = function(e) {
+        // Don't select when clicking on cells or resize handles (they handle their own editing)
+        if (e.target.tagName === 'TH' || e.target.tagName === 'TD') {
+            return;
+        }
+        if (e.target.classList.contains('col-resize-handle') || e.target.classList.contains('edge-resize-handle') || e.target.classList.contains('corner-resize-handle')) {
+            return;
+        }
+        selectTable(tableData.id);
+        e.stopPropagation();
+    };
+    
+    // Double click - no longer opens modal, cells are directly editable
+    wrapper.ondblclick = function(e) {
+        e.stopPropagation();
+    };
+    
+    return wrapper;
+}
+
+// Column resize functionality
+let isResizingColumn = false;
+let resizingTableId = null;
+let resizingColIndex = null;
+let resizeStartX = 0;
+let resizeStartWidths = []; // Store all column widths at start
+
+function startColumnResize(e, tableId, colIndex) {
+    e.preventDefault();
+    isResizingColumn = true;
+    resizingTableId = tableId;
+    resizingColIndex = colIndex;
+    resizeStartX = e.clientX;
+    
+    const tableData = getTableData(tableId);
+    // Store a copy of all column widths at start
+    resizeStartWidths = [...tableData.columnWidths];
+    
+    // Add highlight to resize handle
+    const handle = e.target;
+    handle.classList.add('resizing');
+    
+    document.addEventListener('mousemove', handleColumnResize);
+    document.addEventListener('mouseup', stopColumnResize);
+}
+
+function handleColumnResize(e) {
+    if (!isResizingColumn) return;
+    
+    const tableData = getTableData(resizingTableId);
+    if (!tableData) return;
+    
+    const deltaX = e.clientX - resizeStartX;
+    
+    // Calculate new width for the current column
+    const newWidth = Math.max(30, resizeStartWidths[resizingColIndex] + deltaX);
+    
+    // Update only the resized column, keep total table width
+    tableData.columnWidths[resizingColIndex] = newWidth;
+    
+    // Recalculate total width
+    const totalWidth = tableData.columnWidths.reduce((sum, w) => sum + w, 0);
+    tableData.size.width = totalWidth;
+    
+    // Update the table wrapper and column widths directly without full re-render
+    const wrapper = document.querySelector(`.table-wrapper[data-table-id="${resizingTableId}"]`);
+    if (wrapper) {
+        wrapper.style.width = `${totalWidth + 12}px`; // +12 for padding
+        
+        // Update colgroup widths
+        const cols = wrapper.querySelectorAll('col');
+        tableData.columnWidths.forEach((w, i) => {
+            if (cols[i]) cols[i].style.width = `${w}px`;
+        });
+        
+        // Update column resize handle positions
+        updateColumnHandlePositions(wrapper, tableData);
+    }
+    
+    // Show tooltip
+    showDimensionTooltip(
+        e.clientX + 10,
+        e.clientY + 10,
+        `Столбец ${resizingColIndex + 1}: ${newWidth}px`
+    );
+}
+
+function stopColumnResize(e) {
+    if (!isResizingColumn) return;
+    
+    isResizingColumn = false;
+    hideDimensionTooltip();
+    
+    // Remove highlight from all resize handles
+    document.querySelectorAll('.col-resize-handle.resizing').forEach(h => h.classList.remove('resizing'));
+    
+    document.removeEventListener('mousemove', handleColumnResize);
+    document.removeEventListener('mouseup', stopColumnResize);
+    
+    resizingTableId = null;
+    resizingColIndex = null;
+    resizeStartWidths = [];
+    
+    debouncedSave();
+}
+
+// Edge resize functionality (left/right edges resize first/last column)
+let isResizingEdge = false;
+let resizingEdgeTableId = null;
+let resizingEdgeSide = null; // 'left' or 'right'
+let edgeResizeStartX = 0;
+let edgeResizeStartWidth = 0;
+let edgeResizeStartPosition = 0;
+
+function startEdgeResize(e, tableId, side) {
+    e.preventDefault();
+    isResizingEdge = true;
+    resizingEdgeTableId = tableId;
+    resizingEdgeSide = side;
+    edgeResizeStartX = e.clientX;
+    
+    const tableData = getTableData(tableId);
+    if (!tableData) return;
+    
+    if (side === 'left') {
+        edgeResizeStartWidth = tableData.columnWidths[0];
+        edgeResizeStartPosition = tableData.position.x;
+    } else {
+        edgeResizeStartWidth = tableData.columnWidths[tableData.columns - 1];
+    }
+    
+    // Add highlight
+    e.target.classList.add('resizing');
+    
+    document.addEventListener('mousemove', handleEdgeResize);
+    document.addEventListener('mouseup', stopEdgeResize);
+}
+
+function handleEdgeResize(e) {
+    if (!isResizingEdge) return;
+    
+    const tableData = getTableData(resizingEdgeTableId);
+    if (!tableData) return;
+    
+    const deltaX = e.clientX - edgeResizeStartX;
+    
+    if (resizingEdgeSide === 'left') {
+        // Left edge: resize first column, move table position
+        const newWidth = Math.max(30, edgeResizeStartWidth - deltaX);
+        const widthDelta = edgeResizeStartWidth - newWidth;
+        
+        tableData.columnWidths[0] = newWidth;
+        tableData.position.x = edgeResizeStartPosition + widthDelta;
+    } else {
+        // Right edge: resize last column
+        const newWidth = Math.max(30, edgeResizeStartWidth + deltaX);
+        tableData.columnWidths[tableData.columns - 1] = newWidth;
+    }
+    
+    // Recalculate total width
+    const totalWidth = tableData.columnWidths.reduce((sum, w) => sum + w, 0);
+    tableData.size.width = totalWidth;
+    
+    // Update visual
+    const wrapper = document.querySelector(`.table-wrapper[data-table-id="${resizingEdgeTableId}"]`);
+    if (wrapper) {
+        wrapper.style.width = `${totalWidth + 12}px`; // +12 for padding
+        wrapper.style.left = `${tableData.position.x}px`;
+        
+        // Update colgroup widths
+        const cols = wrapper.querySelectorAll('col');
+        tableData.columnWidths.forEach((w, i) => {
+            if (cols[i]) cols[i].style.width = `${w}px`;
+        });
+        
+        // Update column resize handle positions
+        updateColumnHandlePositions(wrapper, tableData);
+    }
+    
+    // Show tooltip
+    const colIndex = resizingEdgeSide === 'left' ? 0 : tableData.columns - 1;
+    const colWidth = tableData.columnWidths[colIndex];
+    showDimensionTooltip(
+        e.clientX + 10,
+        e.clientY + 10,
+        `Столбец ${colIndex + 1}: ${colWidth}px`
+    );
+}
+
+function stopEdgeResize(e) {
+    if (!isResizingEdge) return;
+    
+    isResizingEdge = false;
+    hideDimensionTooltip();
+    
+    // Remove highlight
+    document.querySelectorAll('.edge-resize-handle.resizing').forEach(h => h.classList.remove('resizing'));
+    
+    document.removeEventListener('mousemove', handleEdgeResize);
+    document.removeEventListener('mouseup', stopEdgeResize);
+    
+    resizingEdgeTableId = null;
+    resizingEdgeSide = null;
+    
+    debouncedSave();
+}
+
+function updateColumnHandlePositions(wrapper, tableData) {
+    const handles = wrapper.querySelectorAll('.col-resize-handle');
+    let xOffset = 6; // Start after left padding
+    for (let i = 0; i < tableData.columns - 1; i++) {
+        xOffset += tableData.columnWidths[i];
+        if (handles[i]) handles[i].style.left = `${xOffset + 3}px`;
+    }
+}
+
+// Corner resize functionality (proportional scale of entire table)
+let isResizingCorner = false;
+let resizingCornerTableId = null;
+let resizingCornerPosition = null; // 'top-left', 'top-right', 'bottom-left', 'bottom-right'
+let cornerResizeStartX = 0;
+let cornerResizeStartY = 0;
+let cornerResizeStartWidths = [];
+let cornerResizeStartFontSize = 12;
+let cornerResizeStartTotalWidth = 0;
+let cornerResizeStartPosition = { x: 0, y: 0 };
+
+function startCornerResize(e, tableId, corner) {
+    e.preventDefault();
+    isResizingCorner = true;
+    resizingCornerTableId = tableId;
+    resizingCornerPosition = corner;
+    cornerResizeStartX = e.clientX;
+    cornerResizeStartY = e.clientY;
+    
+    const tableData = getTableData(tableId);
+    if (!tableData) return;
+    
+    cornerResizeStartWidths = [...tableData.columnWidths];
+    cornerResizeStartTotalWidth = tableData.columnWidths.reduce((sum, w) => sum + w, 0);
+    cornerResizeStartFontSize = tableData.fontSize || 12;
+    cornerResizeStartPosition = { x: tableData.position.x, y: tableData.position.y };
+    
+    document.addEventListener('mousemove', handleCornerResize);
+    document.addEventListener('mouseup', stopCornerResize);
+}
+
+function handleCornerResize(e) {
+    if (!isResizingCorner) return;
+    
+    const tableData = getTableData(resizingCornerTableId);
+    if (!tableData) return;
+    
+    const deltaX = e.clientX - cornerResizeStartX;
+    const deltaY = e.clientY - cornerResizeStartY;
+    
+    // Calculate scale based on diagonal movement
+    let scaleDeltaX = 0;
+    let scaleDeltaY = 0;
+    let moveX = false;
+    let moveY = false;
+    
+    if (resizingCornerPosition.includes('left')) {
+        scaleDeltaX = -deltaX;
+        moveX = true;
+    } else {
+        scaleDeltaX = deltaX;
+    }
+    
+    if (resizingCornerPosition.includes('top')) {
+        scaleDeltaY = -deltaY;
+        moveY = true;
+    } else {
+        scaleDeltaY = deltaY;
+    }
+    
+    // Use average of X and Y deltas for proportional scaling
+    const avgDelta = (scaleDeltaX + scaleDeltaY) / 2;
+    const scaleFactor = Math.max(0.3, Math.min(3, 1 + (avgDelta / cornerResizeStartTotalWidth)));
+    
+    // Apply proportional scaling to all columns
+    for (let i = 0; i < tableData.columns; i++) {
+        tableData.columnWidths[i] = Math.max(20, Math.round(cornerResizeStartWidths[i] * scaleFactor));
+    }
+    
+    // Scale font size proportionally
+    const newFontSize = Math.max(8, Math.min(48, Math.round(cornerResizeStartFontSize * scaleFactor)));
+    tableData.fontSize = newFontSize;
+    
+    // Recalculate total width
+    const totalWidth = tableData.columnWidths.reduce((sum, w) => sum + w, 0);
+    tableData.size.width = totalWidth;
+    
+    // Update position if resizing from left or top
+    if (moveX) {
+        tableData.position.x = cornerResizeStartPosition.x - (totalWidth - cornerResizeStartTotalWidth);
+    }
+    
+    // Update visual
+    const wrapper = document.querySelector(`.table-wrapper[data-table-id="${resizingCornerTableId}"]`);
+    if (wrapper) {
+        wrapper.style.width = `${totalWidth + 12}px`;
+        wrapper.style.left = `${tableData.position.x}px`;
+        
+        // Update font size
+        const tableEl = wrapper.querySelector('table');
+        if (tableEl) {
+            tableEl.style.fontSize = `${newFontSize}px`;
+        }
+        
+        // Update colgroup widths
+        const cols = wrapper.querySelectorAll('col');
+        tableData.columnWidths.forEach((w, i) => {
+            if (cols[i]) cols[i].style.width = `${w}px`;
+        });
+        
+        // Update column resize handle positions
+        updateColumnHandlePositions(wrapper, tableData);
+        
+        // Update Y position if resizing from top
+        if (moveY) {
+            const heightDiff = wrapper.offsetHeight - (wrapper.dataset.startHeight || wrapper.offsetHeight);
+            // For top corners, we need to track height change differently
+            // Since height is auto, we just update position based on scale
+        }
+    }
+    
+    // Show tooltip
+    showDimensionTooltip(
+        e.clientX + 10,
+        e.clientY + 10,
+        `${Math.round(scaleFactor * 100)}% (${newFontSize}px)`
+    );
+}
+
+function stopCornerResize(e) {
+    if (!isResizingCorner) return;
+    
+    isResizingCorner = false;
+    hideDimensionTooltip();
+    
+    document.removeEventListener('mousemove', handleCornerResize);
+    document.removeEventListener('mouseup', stopCornerResize);
+    
+    resizingCornerTableId = null;
+    resizingCornerPosition = null;
+    cornerResizeStartWidths = [];
+    
+    debouncedSave();
+}
+
+function selectTable(tableId) {
+    deselectAllTables();
+    deselectAllImages();
+    
+    const wrapper = document.querySelector(`.table-wrapper[data-table-id="${tableId}"]`);
+    if (wrapper) {
+        wrapper.classList.add('selected');
+        selectedTableId = tableId;
+    }
+}
+
+function deselectAllTables() {
+    document.querySelectorAll('.table-wrapper.selected').forEach(el => {
+        el.classList.remove('selected');
+    });
+    selectedTableId = null;
+}
+
+function getTableData(tableId) {
+    const tables = slides[currentSlideIndex].tables || [];
+    return tables.find(t => t.id === tableId);
+}
+
+// Sync cell content to data model (preserves HTML formatting)
+function syncCellToData(cell) {
+    const tableId = cell.dataset.tableId;
+    const row = parseInt(cell.dataset.row);
+    const col = parseInt(cell.dataset.col);
+    
+    const tableData = getTableData(tableId);
+    if (!tableData) return;
+    
+    // Store the HTML content directly to preserve formatting
+    const cellKey = `${row}_${col}`;
+    tableData.cellData[cellKey] = cell.innerHTML;
+    
+    // Update table height based on content
+    const wrapper = document.querySelector(`.table-wrapper[data-table-id="${tableId}"]`);
+    if (wrapper) {
+        // Get the actual rendered height of the table
+        tableData.size.height = wrapper.offsetHeight;
+    }
+    
+    // Debounce save
+    debouncedSave();
+}
+
+// Navigate between cells with Tab key
+function navigateTableCell(currentCell, direction) {
+    const tableId = currentCell.dataset.tableId;
+    const currentRow = parseInt(currentCell.dataset.row);
+    const currentCol = parseInt(currentCell.dataset.col);
+    
+    const tableData = getTableData(tableId);
+    if (!tableData) return;
+    
+    let newRow = currentRow;
+    let newCol = currentCol + direction;
+    
+    // Handle column overflow
+    if (newCol >= tableData.columns) {
+        newCol = 0;
+        newRow++;
+    } else if (newCol < 0) {
+        newCol = tableData.columns - 1;
+        newRow--;
+    }
+    
+    // Handle row overflow
+    if (newRow >= tableData.rows) {
+        newRow = 0;
+    } else if (newRow < 0) {
+        newRow = tableData.rows - 1;
+    }
+    
+    // Find and focus the target cell
+    const wrapper = document.querySelector(`.table-wrapper[data-table-id="${tableId}"]`);
+    if (wrapper) {
+        const targetCell = wrapper.querySelector(`[data-row="${newRow}"][data-col="${newCol}"]`);
+        if (targetCell) {
+            targetCell.focus();
+            // Select all content in the cell
+            const selection = window.getSelection();
+            const range = document.createRange();
+            range.selectNodeContents(targetCell);
+            selection.removeAllRanges();
+            selection.addRange(range);
+        }
+    }
+}
+
+function initializeTableInteractions() {
+    if (typeof interact === 'undefined') {
+        console.error('Interact.js not loaded yet');
+        return;
+    }
+    
+    const wrappers = document.querySelectorAll('.table-wrapper');
+    console.log('Initializing Interact.js on', wrappers.length, 'table wrappers');
+    
+    wrappers.forEach(wrapper => {
+        const tableId = wrapper.dataset.tableId;
+        const tableData = getTableData(tableId);
+        
+        if (!tableData) return;
+        
+        // Configure draggable - allow dragging from empty space only
+        interact(wrapper)
+            .draggable({
+                inertia: false,
+                ignoreFrom: 'th, td, .col-resize-handle, .edge-resize-handle, .corner-resize-handle',
+                modifiers: [
+                    interact.modifiers.restrictRect({
+                        restriction: 'parent',
+                        endOnly: true
+                    })
+                ],
+                listeners: {
+                    start: (event) => {
+                        event.target.classList.add('dragging');
+                    },
+                    move: (event) => {
+                        const target = event.target;
+                        const tableData = getTableData(tableId);
+                        
+                        // Update position
+                        const x = (parseFloat(target.style.left) || 0) + event.dx;
+                        const y = (parseFloat(target.style.top) || 0) + event.dy;
+                        
+                        target.style.left = `${x}px`;
+                        target.style.top = `${y}px`;
+                        
+                        // Update data model
+                        if (tableData) {
+                            tableData.position.x = Math.round(x);
+                            tableData.position.y = Math.round(y);
+                        }
+                        
+                        // Show position tooltip
+                        showDimensionTooltip(
+                            event.clientX + 10,
+                            event.clientY + 10,
+                            `X: ${Math.round(x)}, Y: ${Math.round(y)}`
+                        );
+                    },
+                    end: (event) => {
+                        event.target.classList.remove('dragging');
+                        hideDimensionTooltip();
+                        debouncedSave();
+                    }
+                }
+            });
+    });
 }
 
 // Arrow management functions
@@ -2938,8 +4072,14 @@ function handleSlidePreviewClick(e) {
         return;
     }
     
-    // Click on text or empty area - deselect images
+    // If clicked on a table wrapper, let it handle itself
+    if (e.target.closest('.table-wrapper')) {
+        return;
+    }
+    
+    // Click on text or empty area - deselect images and tables
     deselectAllImages();
+    deselectAllTables();
 }
 
 // Initialize Interact.js on all image wrappers
@@ -3211,49 +4351,101 @@ function hideDimensionTooltip() {
 
 // Keyboard shortcuts (optional)
 document.addEventListener('keydown', (e) => {
-    if (!selectedImageId) return;
-    
-    // Delete key - remove selected image
-    if (e.key === 'Delete') {
-        e.preventDefault();
-        removeImage(selectedImageId);
-    }
-    
-    // Escape key - deselect
-    if (e.key === 'Escape') {
-        e.preventDefault();
-        deselectAllImages();
-    }
-    
-    // Arrow keys - nudge position
-    const imageData = getImageData(selectedImageId);
-    if (imageData && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
-        e.preventDefault();
-        const step = e.shiftKey ? 10 : 1;
-        
-        switch(e.key) {
-            case 'ArrowUp':
-                imageData.position.y = Math.max(0, imageData.position.y - step);
-                break;
-            case 'ArrowDown':
-                imageData.position.y += step;
-                break;
-            case 'ArrowLeft':
-                imageData.position.x = Math.max(0, imageData.position.x - step);
-                break;
-            case 'ArrowRight':
-                imageData.position.x += step;
-                break;
+    // Handle image shortcuts
+    if (selectedImageId) {
+        // Delete key - remove selected image
+        if (e.key === 'Delete') {
+            e.preventDefault();
+            removeImage(selectedImageId);
+            return;
         }
         
-        // Update visual
-        const wrapper = document.querySelector(`.image-wrapper[data-image-id="${selectedImageId}"]`);
-        if (wrapper) {
-            wrapper.style.left = `${imageData.position.x}px`;
-            wrapper.style.top = `${imageData.position.y}px`;
+        // Escape key - deselect
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            deselectAllImages();
+            return;
         }
         
-        debouncedSave();
+        // Arrow keys - nudge position
+        const imageData = getImageData(selectedImageId);
+        if (imageData && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+            e.preventDefault();
+            const step = e.shiftKey ? 10 : 1;
+            
+            switch(e.key) {
+                case 'ArrowUp':
+                    imageData.position.y = Math.max(0, imageData.position.y - step);
+                    break;
+                case 'ArrowDown':
+                    imageData.position.y += step;
+                    break;
+                case 'ArrowLeft':
+                    imageData.position.x = Math.max(0, imageData.position.x - step);
+                    break;
+                case 'ArrowRight':
+                    imageData.position.x += step;
+                    break;
+            }
+            
+            // Update visual
+            const wrapper = document.querySelector(`.image-wrapper[data-image-id="${selectedImageId}"]`);
+            if (wrapper) {
+                wrapper.style.left = `${imageData.position.x}px`;
+                wrapper.style.top = `${imageData.position.y}px`;
+            }
+            
+            debouncedSave();
+        }
+        return;
+    }
+    
+    // Handle table shortcuts
+    if (selectedTableId) {
+        // Delete key - remove selected table
+        if (e.key === 'Delete') {
+            e.preventDefault();
+            removeTable(selectedTableId);
+            return;
+        }
+        
+        // Escape key - deselect
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            deselectAllTables();
+            return;
+        }
+        
+        // Arrow keys - nudge position
+        const tableData = getTableData(selectedTableId);
+        if (tableData && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+            e.preventDefault();
+            const step = e.shiftKey ? 10 : 1;
+            
+            switch(e.key) {
+                case 'ArrowUp':
+                    tableData.position.y = Math.max(0, tableData.position.y - step);
+                    break;
+                case 'ArrowDown':
+                    tableData.position.y += step;
+                    break;
+                case 'ArrowLeft':
+                    tableData.position.x = Math.max(0, tableData.position.x - step);
+                    break;
+                case 'ArrowRight':
+                    tableData.position.x += step;
+                    break;
+            }
+            
+            // Update visual
+            const wrapper = document.querySelector(`.table-wrapper[data-table-id="${selectedTableId}"]`);
+            if (wrapper) {
+                wrapper.style.left = `${tableData.position.x}px`;
+                wrapper.style.top = `${tableData.position.y}px`;
+            }
+            
+            debouncedSave();
+        }
     }
 });
 </script>
@@ -3270,18 +4462,21 @@ document.addEventListener('keydown', (e) => {
         setTimeout(() => {
             console.log('Calling initializeImageInteractions...');
             initializeImageInteractions();
+            initializeTableInteractions();
         }, 100);
         
-        // Try again after 500ms to catch any late-rendered images
+        // Try again after 500ms to catch any late-rendered elements
         setTimeout(() => {
             console.log('Re-initializing after 500ms...');
             initializeImageInteractions();
+            initializeTableInteractions();
         }, 500);
         
         // And again after 1 second
         setTimeout(() => {
             console.log('Re-initializing after 1s...');
             initializeImageInteractions();
+            initializeTableInteractions();
         }, 1000);
     } else {
         console.log('Waiting for Interact.js...');
