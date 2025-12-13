@@ -1294,7 +1294,7 @@
 </div>
 
 <!-- Full-screen loading overlay for PDF generation -->
-<div id="pdfLoadingOverlay" class="hidden fixed inset-0 bg-white z-[9999] flex flex-col items-center justify-center">
+<div id="pdfLoadingOverlay" class="hidden fixed inset-0 bg-white flex flex-col items-center justify-center" style="z-index: 999999;">
     <div class="text-center">
         <div class="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-500 mx-auto mb-4"></div>
         <h2 class="text-2xl font-bold text-gray-700 mb-2">Создание PDF</h2>
@@ -6781,7 +6781,8 @@ function createOffscreenSlidePreview(slideData, previewWidth, previewHeight) {
         imagesLayer.style.cssText = 'position: absolute; inset: 0;';
         slideData.images.forEach(img => {
             const imgEl = document.createElement('img');
-            imgEl.src = img.src;
+            imgEl.src = img.url; // FIXED: use 'url' not 'src'
+            imgEl.crossOrigin = 'anonymous';
             imgEl.style.cssText = `
                 position: absolute;
                 left: ${img.position?.x || 0}px;
@@ -6790,6 +6791,9 @@ function createOffscreenSlidePreview(slideData, previewWidth, previewHeight) {
                 height: ${img.size?.height || 100}px;
                 object-fit: contain;
             `;
+            if (img.rotation) {
+                imgEl.style.transform = `rotate(${img.rotation}deg)`;
+            }
             imagesLayer.appendChild(imgEl);
         });
         preview.appendChild(imagesLayer);
@@ -6807,6 +6811,7 @@ function createOffscreenSlidePreview(slideData, previewWidth, previewHeight) {
                 top: ${tbl.position?.y || 0}px;
                 width: ${tbl.size?.width || 200}px;
                 height: ${tbl.size?.height || 100}px;
+                overflow: hidden;
             `;
             
             const table = document.createElement('table');
@@ -6815,23 +6820,26 @@ function createOffscreenSlidePreview(slideData, previewWidth, previewHeight) {
                 height: 100%;
                 border-collapse: collapse;
                 font-size: 14px;
+                table-layout: fixed;
             `;
             
-            if (tbl.data) {
-                tbl.data.forEach((row, ri) => {
-                    const tr = document.createElement('tr');
-                    row.forEach((cell, ci) => {
-                        const td = document.createElement(ri === 0 && tbl.headerRow ? 'th' : 'td');
-                        td.innerHTML = cell;
-                        td.style.cssText = `
-                            border: 1px solid #ccc;
-                            padding: 4px 8px;
-                            background: ${tbl.fillColor || 'transparent'};
-                        `;
-                        tr.appendChild(td);
-                    });
-                    table.appendChild(tr);
-                });
+            // Render table rows and columns
+            for (let row = 0; row < (tbl.rows || 1); row++) {
+                const tr = document.createElement('tr');
+                for (let col = 0; col < (tbl.columns || 1); col++) {
+                    const td = document.createElement('td');
+                    const cellKey = `${row}_${col}`;
+                    td.innerHTML = tbl.cellData?.[cellKey] || '';
+                    const cellBg = tbl.cellBgColors?.[cellKey] || (tbl.fillColor || '#FFFFFF');
+                    td.style.cssText = `
+                        border: 1px solid #ccc;
+                        padding: 4px 8px;
+                        background: ${cellBg};
+                        vertical-align: middle;
+                    `;
+                    tr.appendChild(td);
+                }
+                table.appendChild(tr);
             }
             wrapper.appendChild(table);
             tablesLayer.appendChild(wrapper);
@@ -6839,34 +6847,82 @@ function createOffscreenSlidePreview(slideData, previewWidth, previewHeight) {
         preview.appendChild(tablesLayer);
     }
     
-    // Arrows layer
+    // Arrows layer - FIXED: use startPoint/endPoint
     if (slideData.arrows && slideData.arrows.length > 0) {
         const arrowsLayer = document.createElement('div');
-        arrowsLayer.style.cssText = 'position: absolute; inset: 0;';
+        arrowsLayer.style.cssText = 'position: absolute; inset: 0; pointer-events: none;';
         slideData.arrows.forEach(arrow => {
+            // Calculate bounding box
+            const padding = 20;
+            const minX = Math.min(arrow.startPoint.x, arrow.endPoint.x);
+            const minY = Math.min(arrow.startPoint.y, arrow.endPoint.y);
+            const maxX = Math.max(arrow.startPoint.x, arrow.endPoint.x);
+            const maxY = Math.max(arrow.startPoint.y, arrow.endPoint.y);
+            const width = maxX - minX;
+            const height = maxY - minY;
+            
             const wrapper = document.createElement('div');
-            const rotation = arrow.rotation || 0;
             wrapper.style.cssText = `
                 position: absolute;
-                left: ${arrow.position?.x || 0}px;
-                top: ${arrow.position?.y || 0}px;
-                width: ${arrow.size?.width || 100}px;
-                height: ${arrow.size?.height || 40}px;
-                transform: rotate(${rotation}deg);
+                left: ${minX - padding}px;
+                top: ${minY - padding}px;
+                width: ${width + 2 * padding}px;
+                height: ${height + 2 * padding}px;
             `;
             
-            // SVG arrow
+            // Create SVG
             const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-            svg.setAttribute('viewBox', '0 0 100 40');
-            svg.style.cssText = 'width: 100%; height: 100%;';
+            svg.setAttribute('width', '100%');
+            svg.setAttribute('height', '100%');
+            svg.style.overflow = 'visible';
             
-            const color = arrow.color || '#000000';
-            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            path.setAttribute('d', 'M0,20 L70,20 M60,10 L70,20 L60,30');
-            path.setAttribute('stroke', color);
-            path.setAttribute('stroke-width', '3');
-            path.setAttribute('fill', 'none');
-            svg.appendChild(path);
+            // Arrowhead marker
+            const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+            const marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
+            marker.setAttribute('id', 'pdf-arrowhead-' + arrow.id);
+            marker.setAttribute('markerWidth', '10');
+            marker.setAttribute('markerHeight', '10');
+            marker.setAttribute('refX', '9');
+            marker.setAttribute('refY', '3');
+            marker.setAttribute('orient', 'auto');
+            
+            const arrowheadPath = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+            arrowheadPath.setAttribute('points', '0 0, 10 3, 0 6');
+            arrowheadPath.setAttribute('fill', arrow.color || '#000000');
+            marker.appendChild(arrowheadPath);
+            defs.appendChild(marker);
+            svg.appendChild(defs);
+            
+            // Arrow line
+            const relStartX = arrow.startPoint.x - minX + padding;
+            const relStartY = arrow.startPoint.y - minY + padding;
+            const relEndX = arrow.endPoint.x - minX + padding;
+            const relEndY = arrow.endPoint.y - minY + padding;
+            
+            let pathEl;
+            if (arrow.type === 'bent') {
+                const midX = (relStartX + relEndX) / 2;
+                pathEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                pathEl.setAttribute('d', `M ${relStartX},${relStartY} L ${midX},${relStartY} L ${midX},${relEndY} L ${relEndX},${relEndY}`);
+                pathEl.setAttribute('fill', 'none');
+            } else if (arrow.type === 'curved') {
+                const controlX = (relStartX + relEndX) / 2;
+                const controlY = relStartY - 50;
+                pathEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                pathEl.setAttribute('d', `M ${relStartX},${relStartY} Q ${controlX},${controlY} ${relEndX},${relEndY}`);
+                pathEl.setAttribute('fill', 'none');
+            } else {
+                pathEl = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                pathEl.setAttribute('x1', relStartX);
+                pathEl.setAttribute('y1', relStartY);
+                pathEl.setAttribute('x2', relEndX);
+                pathEl.setAttribute('y2', relEndY);
+            }
+            
+            pathEl.setAttribute('stroke', arrow.color || '#000000');
+            pathEl.setAttribute('stroke-width', arrow.strokeWidth || 2);
+            pathEl.setAttribute('marker-end', 'url(#pdf-arrowhead-' + arrow.id + ')');
+            svg.appendChild(pathEl);
             wrapper.appendChild(svg);
             arrowsLayer.appendChild(wrapper);
         });
@@ -6897,6 +6953,7 @@ function createOffscreenSlidePreview(slideData, previewWidth, previewHeight) {
                 align-items: center;
                 justify-content: center;
                 text-align: center;
+                box-sizing: border-box;
             `;
             boxesLayer.appendChild(wrapper);
         });
