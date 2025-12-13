@@ -10,15 +10,41 @@
             Автоматизированный дизайн презентаций
         </h1>
         <p class="text-xl text-gray-600">
-            Вставьте ссылку на Google Slides и получите профессионально оформленную презентацию
+            Вставьте ссылку на Google Slides или текст презентации
         </p>
     </div>
 
     <!-- Processing Form -->
     <div class="bg-white rounded-lg shadow-lg p-8 mb-8">
         <form action="/process" method="POST" class="space-y-6">
-            <!-- URL Input -->
-            <div>
+            <!-- Input Method Selector -->
+            <div class="mb-6">
+                <label class="block mb-3 text-sm font-medium text-gray-900">
+                    Выберите способ ввода:
+                </label>
+                <div class="flex gap-4">
+                    <label class="flex items-center cursor-pointer">
+                        <input type="radio" 
+                               name="input_method" 
+                               value="url" 
+                               checked 
+                               onchange="toggleInputMethod()"
+                               class="w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 focus:ring-purple-500">
+                        <span class="ml-2 text-sm font-medium text-gray-900">Google Slides URL</span>
+                    </label>
+                    <label class="flex items-center cursor-pointer">
+                        <input type="radio" 
+                               name="input_method" 
+                               value="text" 
+                               onchange="toggleInputMethod()"
+                               class="w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 focus:ring-purple-500">
+                        <span class="ml-2 text-sm font-medium text-gray-900">Вставить текст</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- URL Input Container -->
+            <div id="urlInputContainer">
                 <label for="presentation_url" class="block mb-2 text-sm font-medium text-gray-900">
                     Google Slides URL
                 </label>
@@ -26,13 +52,34 @@
                        id="presentation_url" 
                        name="presentation_url"
                        class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
-                       placeholder="https://docs.google.com/presentation/d/..."
-                       required>
+                       placeholder="https://docs.google.com/presentation/d/...">
                 <p class="mt-2 text-sm text-gray-500">
                     Вставьте ссылку на вашу презентацию Google Slides
                 </p>
             </div>
 
+            <!-- Text Input Container -->
+            <div id="textInputContainer" class="hidden">
+                <label for="presentation_text" class="block mb-2 text-sm font-medium text-gray-900">
+                    Текст презентации
+                </label>
+                <textarea id="presentation_text" 
+                          name="presentation_text"
+                          rows="15"
+                          class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
+                          placeholder="Вставьте текст вашей презентации...
+
+Слайд 1
+Заголовок первого слайда
+Основной текст
+
+Слайд 2
+Заголовок второго слайда
+..."></textarea>
+                <p class="mt-2 text-sm text-gray-500">
+                    Вставьте текст. Слайды можно разделять пустыми строками или использовать "Слайд 1", "Слайд 2" и т.д.
+                </p>
+            </div>
 
             <button type="submit"
                     class="w-full text-white bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 focus:ring-4 focus:outline-none focus:ring-purple-300 font-medium rounded-lg text-sm px-5 py-3">
@@ -40,6 +87,28 @@
             </button>
         </form>
     </div>
+
+    <script>
+    function toggleInputMethod() {
+        const inputMethod = document.querySelector('input[name="input_method"]:checked').value;
+        const urlContainer = document.getElementById('urlInputContainer');
+        const textContainer = document.getElementById('textInputContainer');
+        const urlInput = document.getElementById('presentation_url');
+        const textInput = document.getElementById('presentation_text');
+        
+        if (inputMethod === 'url') {
+            urlContainer.classList.remove('hidden');
+            textContainer.classList.add('hidden');
+            urlInput.required = true;
+            textInput.required = false;
+        } else {
+            urlContainer.classList.add('hidden');
+            textContainer.classList.remove('hidden');
+            urlInput.required = false;
+            textInput.required = true;
+        }
+    }
+    </script>
 
     <!-- Features -->
     <div class="grid md:grid-cols-3 gap-6">

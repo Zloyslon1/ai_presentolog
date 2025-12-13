@@ -581,52 +581,84 @@ def index():
 @requires_auth
 def process():
     """Extract presentation and redirect to editor."""
-    presentation_url = request.form.get('presentation_url')
-    # Template selection removed - no longer needed
-    
-    if not presentation_url:
-        return jsonify({'error': 'Presentation URL is required'}), 400
-    
-    # Get credentials from session
-    credentials = oauth_manager.get_credentials()
-    if not credentials:
-        return redirect(url_for('login'))
-    
-    # Convert credentials to dictionary
-    credentials_dict = {
-        'token': credentials.token,
-        'refresh_token': credentials.refresh_token,
-        'token_uri': credentials.token_uri,
-        'client_id': credentials.client_id,
-        'client_secret': credentials.client_secret,
-        'scopes': credentials.scopes
-    }
+    input_method = request.form.get('input_method', 'url')
     
     # Get session ID
     session_id = get_session_id()
     
-    # Create job for extraction
-    job_id = str(uuid.uuid4())[:8]
-    jobs[job_id] = {
-        'id': job_id,
-        'url': presentation_url,
-        'template': None,  # No template needed
-        'status': 'extracting',
-        'created_at': datetime.now().isoformat(),
-        'result': None,
-        'error': None,
-        'session_id': session_id  # Link job to session
-    }
+    if input_method == 'url':
+        presentation_url = request.form.get('presentation_url')
+        if not presentation_url:
+            return jsonify({'error': 'Presentation URL is required'}), 400
+        
+        # Get credentials from session
+        credentials = oauth_manager.get_credentials()
+        if not credentials:
+            return redirect(url_for('login'))
+        
+        # Convert credentials to dictionary
+        credentials_dict = {
+            'token': credentials.token,
+            'refresh_token': credentials.refresh_token,
+            'token_uri': credentials.token_uri,
+            'client_id': credentials.client_id,
+            'client_secret': credentials.client_secret,
+            'scopes': credentials.scopes
+        }
+        
+        # Create job for extraction
+        job_id = str(uuid.uuid4())[:8]
+        jobs[job_id] = {
+            'id': job_id,
+            'url': presentation_url,
+            'template': None,  # No template needed
+            'status': 'extracting',
+            'created_at': datetime.now().isoformat(),
+            'result': None,
+            'error': None,
+            'session_id': session_id  # Link job to session
+        }
+        
+        # Extract content in background thread
+        thread = threading.Thread(
+            target=extract_for_editor,
+            args=(job_id, presentation_url, credentials_dict)
+        )
+        thread.daemon = True
+        thread.start()
+        
+        return redirect(url_for('extraction_status', job_id=job_id))
+        
+    elif input_method == 'text':
+        raw_text = request.form.get('presentation_text')
+        if not raw_text or not raw_text.strip():
+            return jsonify({'error': 'Text content is required'}), 400
+        
+        # Create job for text parsing
+        job_id = str(uuid.uuid4())[:8]
+        jobs[job_id] = {
+            'id': job_id,
+            'url': None,  # No URL for text input
+            'template': None,
+            'status': 'parsing',
+            'created_at': datetime.now().isoformat(),
+            'result': None,
+            'error': None,
+            'session_id': session_id
+        }
+        
+        # Parse text in background thread
+        thread = threading.Thread(
+            target=parse_text_for_editor,
+            args=(job_id, raw_text)
+        )
+        thread.daemon = True
+        thread.start()
+        
+        return redirect(url_for('extraction_status', job_id=job_id))
     
-    # Extract content in background thread
-    thread = threading.Thread(
-        target=extract_for_editor,
-        args=(job_id, presentation_url, credentials_dict)
-    )
-    thread.daemon = True
-    thread.start()
-    
-    return redirect(url_for('extraction_status', job_id=job_id))
+    else:
+        return jsonify({'error': 'Invalid input method'}), 400
 
 
 def extract_for_editor(job_id, presentation_url, credentials_dict):
@@ -686,6 +718,13 @@ def extract_for_editor(job_id, presentation_url, credentials_dict):
                 # Clean up special characters: replace vertical tab and other whitespace with regular space
                 content = content.replace('\v', ' ').replace('\r', ' ')
                 
+                # Filter out metadata lines like "(макроуровень)", "(микроуровень)" etc.
+                import re as re_filter
+                content_stripped = content.strip()
+                if re_filter.match(r'^\([^)]+уровень\)$', content_stripped, re_filter.IGNORECASE):
+                    print(f"  Element {i}: FILTERED OUT metadata '{content_stripped}'")
+                    continue
+                
                 print(f"  Element {i}: type='{placeholder_type}', content_length={len(content)}, preview='{content[:80] if content else '(empty)'}...")
                 
                 # Add ALL non-empty content to mainText
@@ -700,24 +739,35 @@ def extract_for_editor(job_id, presentation_url, credentials_dict):
                 print(f"  -> Skipping slide {idx}: no text content")
                 continue
             
-            # Create editor slide: ALL text in mainText, title empty
+            # Use TextParser to format the content (same as text paste)
+            from presentation_design.extraction.text_parser import TextParser
+            parser = TextParser()
+            
+            # Combine all text parts and parse as a single slide
+            all_text_content = '\n'.join(all_text_parts)
+            parsed_slide = parser.create_slide_from_content(all_text_content, str(idx + 1))
+            
+            # Format with HTML using the same function as text paste
+            formatted_content = format_slide_content(parsed_slide)
+            
             editor_slide = {
-                'title': '',  # No title separation
-                'mainText': '\n\n'.join(all_text_parts),  # ALL text here
+                'content': formatted_content,  # Formatted HTML with title, lists, etc.
+                'title': parsed_slide.get('title', ''),
+                'mainText': parsed_slide.get('mainText', ''),
                 'secondaryText': '',
                 'original_objectIds': [el.get('objectId', '') for el in raw_elements]
             }
             
-            print(f"\n  RESULT: mainText_length={len(editor_slide['mainText'])}")
-            print(f"  MainText preview: '{editor_slide['mainText'][:150]}...'" if editor_slide['mainText'] else "  MainText: (empty)")
+            print(f"\n  RESULT: content_length={len(editor_slide['content'])}, mainText_length={len(editor_slide['mainText'])}")
+            print(f"  Content preview: '{editor_slide['content'][:150]}..." if editor_slide['content'] else "  Content: (empty)")
             slides.append(editor_slide)
         
         print(f"DEBUG: Total slides for editor: {len(slides)}")
         print(f"\nDEBUG: Slide 0 data being saved to jobs:")
         if slides:
-            print(f"  title: '{slides[0].get('title')}'")
+            print(f"  content length: {len(slides[0].get('content', ''))}")
+            print(f"  content preview: '{slides[0].get('content', '')[:100]}'")
             print(f"  mainText length: {len(slides[0].get('mainText', ''))}")
-            print(f"  mainText preview: '{slides[0].get('mainText', '')[:100]}'")
         jobs[job_id]['status'] = 'extracted'
         jobs[job_id]['slides'] = slides
         jobs[job_id]['completed_at'] = datetime.now().isoformat()
@@ -736,6 +786,88 @@ def extract_for_editor(job_id, presentation_url, credentials_dict):
         
         # Save error to database
         save_job_to_db(job_id, jobs[job_id])
+
+
+def parse_text_for_editor(job_id, raw_text):
+    """Parse raw text into formatted slides.
+    
+    Args:
+        job_id: Job identifier
+        raw_text: User-pasted text content
+    """
+    try:
+        from presentation_design.extraction.text_parser import TextParser
+        
+        print(f"\n=== Parsing text for job {job_id} ===")
+        print(f"Text length: {len(raw_text)} characters")
+        
+        parser = TextParser()
+        slides_data = parser.parse_slides(raw_text)
+        
+        print(f"Parsed {len(slides_data)} slides")
+        
+        # Convert to editor format
+        editor_slides = []
+        for slide in slides_data:
+            formatted_content = format_slide_content(slide)
+            editor_slide = {
+                'content': formatted_content,  # Primary field used by slide_editor.html
+                'title': slide.get('title', ''),  # Legacy compatibility
+                'mainText': slide.get('mainText', ''),  # Legacy compatibility
+                'secondaryText': '',
+                'original_objectIds': []
+            }
+            editor_slides.append(editor_slide)
+            print(f"  Slide {slide.get('id', '?')}: title='{slide.get('title', '')}', content_length={len(formatted_content)}")
+        
+        jobs[job_id]['status'] = 'extracted'
+        jobs[job_id]['slides'] = editor_slides
+        jobs[job_id]['completed_at'] = datetime.now().isoformat()
+        
+        print(f"Successfully parsed {len(editor_slides)} slides for editor")
+        
+        # Save to database
+        save_job_to_db(job_id, jobs[job_id])
+        
+    except Exception as e:
+        print(f"Error parsing text: {e}")
+        import traceback
+        traceback.print_exc()
+        jobs[job_id]['status'] = 'error'
+        jobs[job_id]['error'] = str(e)
+        jobs[job_id]['completed_at'] = datetime.now().isoformat()
+        
+        # Save error to database
+        save_job_to_db(job_id, jobs[job_id])
+
+
+def format_slide_content(slide):
+    """Format slide content with HTML tags.
+    
+    Args:
+        slide: Parsed slide data with title, mainText, etc.
+        
+    Returns:
+        Formatted HTML string
+    """
+    html_parts = []
+    
+    # Add title if present
+    if slide.get('title'):
+        html_parts.append(f"<h1>{slide['title']}</h1>")
+    
+    # Add main text with formatting (already formatted by parser)
+    main_text = slide.get('mainText', '')
+    if main_text:
+        # Main text is already formatted as HTML by the parser
+        html_parts.append(main_text)
+    
+    # Add secondary text if present
+    secondary_text = slide.get('secondaryText', '')
+    if secondary_text:
+        html_parts.append(f"<p class='text-sm text-gray-600'>{secondary_text}</p>")
+    
+    return '\n'.join(html_parts)
 
 
 def process_in_background(job_id, presentation_url, template_name):
@@ -769,16 +901,11 @@ def slide_editor():
         if not user_owns_job(job_id, session_id):
             return render_template('auth_error.html', error='Access denied: This job belongs to another user'), 403
         
-        # Try to get from memory first, then from database
-        job = jobs.get(job_id)
-        if not job:
-            # Try loading from database
-            job = load_job_from_db(job_id)
-            if job:
-                # Cache in memory
-                jobs[job_id] = job
-        
+        # ALWAYS load from database to get latest saved data
+        job = load_job_from_db(job_id)
         if job:
+            # Update memory cache with fresh data
+            jobs[job_id] = job
             presentation_url = job.get('url')
             template = job.get('template', 'default')
             slides_data = job.get('slides', [])
@@ -805,9 +932,13 @@ def slide_editor():
     print(f"Rendering slide_editor with {len(slides_data)} slides")
     if slides_data:
         print(f"First slide data:")
-        print(f"  title: '{slides_data[0].get('title')}'")
-        print(f"  mainText length: {len(slides_data[0].get('mainText', ''))}")
-        print(f"  mainText preview: '{slides_data[0].get('mainText', '')[:100]}'")
+        print(f"  content length: {len(slides_data[0].get('content', ''))}")
+        print(f"  content preview: '{slides_data[0].get('content', '')[:100]}'")
+        if slides_data[0].get('mainText'):
+            print(f"  mainText length: {len(slides_data[0].get('mainText', ''))}")
+        # Check new format fields
+        print(f"  titleText: '{slides_data[0].get('titleText', 'NOT FOUND')[:50] if slides_data[0].get('titleText') else 'NOT FOUND'}'")
+        print(f"  mainTextContent: '{slides_data[0].get('mainTextContent', 'NOT FOUND')[:50] if slides_data[0].get('mainTextContent') else 'NOT FOUND'}'")
     print(f"=========================\n")
     
     return render_template('slide_editor.html',
@@ -1095,7 +1226,10 @@ def api_save_slides():
         if not job:
             # Try loading from database
             job = load_job_from_db(job_id)
-            if not job:
+            if job:
+                # Cache in memory
+                jobs[job_id] = job
+            else:
                 # Create new job entry
                 job = {
                     'id': job_id,
@@ -1150,13 +1284,11 @@ def api_load_slides():
         if not user_owns_job(job_id, session_id):
             return jsonify({'error': 'Access denied'}), 403
         
-        # Try memory first, then database
-        job = jobs.get(job_id)
-        if not job:
-            job = load_job_from_db(job_id)
-            if job:
-                # Cache in memory
-                jobs[job_id] = job
+        # ALWAYS load from database to get latest saved data
+        job = load_job_from_db(job_id)
+        if job:
+            # Update memory cache with fresh data
+            jobs[job_id] = job
         
         if not job:
             return jsonify({
