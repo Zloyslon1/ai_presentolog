@@ -506,23 +506,66 @@
 }
 
 .editor-grid {
-    display: grid;
-    grid-template-columns: 280px 1fr 280px;
-    gap: 1.5rem;
+    display: block;
     max-height: calc(100vh - 10rem);
 }
 
 @media (max-width: 1440px) {
     .editor-grid {
-        grid-template-columns: 240px 1fr 240px;
+        /* single column, no changes needed */
     }
 }
 
 @media (max-width: 1024px) {
     .editor-grid {
-        grid-template-columns: 200px 1fr 200px;
-        gap: 1rem;
+        /* single column, no changes needed */
     }
+}
+
+/* Horizontal slide buttons */
+.slide-buttons-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    background: #f3f4f6;
+    border-radius: 0.5rem;
+    margin-bottom: 1rem;
+    max-height: 80px;
+    overflow-y: auto;
+}
+
+.slide-btn {
+    min-width: 40px;
+    height: 36px;
+    padding: 0.25rem 0.75rem;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    border: 2px solid transparent;
+    background: white;
+    color: #374151;
+}
+
+.slide-btn:hover {
+    background: #e5e7eb;
+}
+
+.slide-btn.active {
+    background: #3b82f6;
+    color: white;
+    border-color: #2563eb;
+}
+
+.slide-btn-add {
+    background: #10b981;
+    color: white;
+}
+
+.slide-btn-add:hover {
+    background: #059669;
 }
 
 .sidebar-panel {
@@ -534,10 +577,7 @@
     flex: 1;
 }
 
-.slides-list-panel {
-    max-height: calc(100vh - 12rem);
-    overflow-y: auto;
-}
+
 
 .center-panel {
     display: flex;
@@ -570,6 +610,62 @@
     margin: 0.25em 0;
     color: inherit;
 }
+
+/* Preview Toolbar Styles */
+.preview-toolbar {
+    flex-shrink: 0;
+}
+
+.toolbar-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 6px 10px;
+    background: white;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    min-width: 50px;
+}
+
+.toolbar-btn:hover {
+    background: #f3f4f6;
+    border-color: #9ca3af;
+}
+
+.toolbar-btn.active {
+    background: #dbeafe;
+    border-color: #3b82f6;
+}
+
+.toolbar-dropdown {
+    position: relative;
+}
+
+.toolbar-dropdown-content {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin-top: 4px;
+    background: white;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+    z-index: 100;
+    min-width: 200px;
+}
+
+.toolbar-dropdown-content.hidden {
+    display: none;
+}
+
+/* Image drop zone active state */
+#imageDropZone.drag-over {
+    border-color: #3b82f6;
+    background: #dbeafe;
+}
 </style>
 <div class="fullscreen-container">
     <div class="mb-6 flex justify-between items-center">
@@ -600,460 +696,401 @@
     </div>
 
     <div class="editor-grid">
-        <!-- Slides List (Left Panel) -->
-        <div class="sidebar-panel slides-list-panel">
-            <div class="bg-white rounded-lg shadow p-4 h-full">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-lg font-bold">Слайды</h2>
-                    <button onclick="addNewSlide()" class="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600">
-                        + Новый
-                    </button>
-                </div>
-                <div id="slidesList" class="space-y-2 max-h-[70vh] overflow-y-auto">
-                    <!-- Slides will be rendered here -->
-                </div>
-            </div>
-        </div>
-
         <!-- Slide Editor (Center Panel) -->
         <div class="center-panel">
             <div class="bg-white rounded-lg shadow p-8 lg:p-10 flex-1">
-                <div class="mb-4 flex justify-between items-center">
-                    <h2 class="text-lg font-bold">Слайд <span id="currentSlideNumber">1</span></h2>
-                    <button onclick="deleteCurrentSlide()" class="px-3 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600">
-                        🗑 Удалить
-                    </button>
-                </div>
-
-                <!-- Formatting Toolbar (above preview) -->
+                <!-- Horizontal Slide Buttons -->
                 <div class="mb-4">
-                    <div class="flex gap-1 flex-wrap border-b pb-2 bg-gray-50 p-2 rounded-t items-center">
-                        <!-- Format selector (like in Word) -->
-                        <select id="formatSelector" onchange="applyFormat()" class="px-2 py-1 bg-white border border-gray-300 rounded text-sm min-w-[180px]" title="Формат">
-                            <option value="p">Обычный текст</option>
-                            <option value="h1">Заголовок 1</option>
-                            <option value="h2">Заголовок 2</option>
-                            <option value="h3">Заголовок 3</option>
-                            <option value="h4">Заголовок 4</option>
-                        </select>
-                        <span class="border-l mx-2"></span>
-                        <button type="button" onmousedown="saveSelection()" onclick="formatText('bold')" class="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 font-bold text-sm" title="Жирный (Ctrl+B)">B</button>
-                        <button type="button" onmousedown="saveSelection()" onclick="formatText('italic')" class="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 italic text-sm" title="Курсив (Ctrl+I)">I</button>
-                        <button type="button" onmousedown="saveSelection()" onclick="formatText('underline')" class="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 underline text-sm" title="Подчёркнутый (Ctrl+U)">U</button>
-                        <span class="border-l mx-2"></span>
-                        <div class="flex items-center gap-1">
-                            <label class="text-xs text-gray-600">Цвет:</label>
-                            <input type="color" id="selectionTextColor" value="#000000" class="h-8 w-10 rounded border cursor-pointer" onmousedown="saveSelection()" onchange="applyTextColor()" title="Цвет текста">
-                        </div>
-                        <span class="border-l mx-2"></span>
-                        <!-- List format dropdown -->
-                        <select id="bulletListStyle" onchange="applyListStyle('ul')" class="px-2 py-1 bg-white border border-gray-300 rounded text-sm" title="Маркированный список">
-                            <option value="" disabled selected>• Список</option>
-                            <option value="disc">• Круглый</option>
-                            <option value="circle">○ Пустой круг</option>
-                            <option value="square">■ Квадрат</option>
-                            <option value="none">— Без маркера</option>
-                            <option value="remove">✕ Убрать список</option>
-                        </select>
-                        <!-- Numbering format dropdown -->
-                        <select id="numberListStyle" onchange="applyListStyle('ol')" class="px-2 py-1 bg-white border border-gray-300 rounded text-sm" title="Нумерованный список">
-                            <option value="" disabled selected>1. Нумерация</option>
-                            <option value="decimal">1, 2, 3...</option>
-                            <option value="decimal-leading-zero">01, 02, 03...</option>
-                            <option value="lower-alpha">a, b, c...</option>
-                            <option value="upper-alpha">A, B, C...</option>
-                            <option value="lower-roman">i, ii, iii...</option>
-                            <option value="upper-roman">I, II, III...</option>
-                            <option value="remove">✕ Убрать список</option>
-                        </select>
-                        <!-- Indent buttons -->
-                        <button type="button" onclick="indentList()" class="px-2 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm" title="Увеличить отступ (Tab)">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"/>
-                            </svg>
+                    <div class="flex justify-between items-center mb-2">
+                        <h2 class="text-lg font-bold">Слайд <span id="currentSlideNumber">1</span></h2>
+                        <button onclick="deleteCurrentSlide()" class="px-3 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600">
+                            🗑 Удалить
                         </button>
-                        <button type="button" onclick="outdentList()" class="px-2 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm" title="Уменьшить отступ (Shift+Tab)">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7M19 19l-7-7 7-7"/>
-                            </svg>
-                        </button>
-                        <span class="border-l mx-2"></span>
-                        <button type="button" onclick="clearAllFormatting()" class="px-2 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-xs" title="Очистить форматирование">✕ Очистить</button>
+                    </div>
+                    <div id="slidesList" class="slide-buttons-row">
+                        <!-- Slide buttons will be rendered here -->
                     </div>
                 </div>
 
-                <!-- Slide Preview (read-only view) -->
-                <div id="slidePreview" class="mb-4 border-2 border-blue-400 rounded-lg bg-white relative preview-container" style="aspect-ratio: 16/9; overflow: hidden; width: 100%;" onclick="handleSlidePreviewClick(event)">
-                    <!-- Text display container (not editable here) -->
-                    <div id="textLayerContainer" class="absolute inset-0 p-8 flex flex-col" style="z-index: 10;">
-                        <div id="previewTitle" class="font-bold text-3xl text-gray-900 mb-2"></div>
-                        <div id="previewMainText" class="text-lg text-gray-700 flex-1"></div>
-                        <div id="previewComment" class="text-sm text-gray-500 mt-auto"></div>
-                    </div>
-                    <!-- Images layer -->
-                    <div id="previewImages" class="absolute inset-0" style="z-index: 20; pointer-events: none;"></div>
-                    <!-- Arrows layer -->
-                    <div id="previewArrows" class="absolute inset-0" style="z-index: 18; pointer-events: none;"></div>
-                    <!-- Tables layer -->
-                    <div id="previewTables" class="absolute inset-0" style="z-index: 15; pointer-events: none;"></div>
-                    <!-- Accent Boxes layer -->
-                    <div id="previewAccentBoxes" class="absolute inset-0" style="z-index: 12; pointer-events: none;"></div>
-                </div>
-                
-                <!-- Dimension Tooltip -->
-                <div id="dimensionTooltip" class="dimension-tooltip"></div>
-                
-                <!-- Text Editors (3 separate blocks) -->
-                <div class="space-y-3">
-                    <!-- Title Editor -->
-                    <div class="border rounded-lg overflow-hidden">
-                        <div class="bg-blue-500 text-white px-3 py-1 text-sm font-semibold flex items-center gap-2">
-                            <span>Заголовок</span>
-                            <span class="text-xs opacity-75">(32px, жирный)</span>
+                <!-- Formatting Toolbar (above preview) - REMOVED, now in each editor block -->
+
+                <!-- Two-column layout: Editors left (1/3), Preview right (2/3) -->
+                <div class="flex gap-4" style="height: calc(100vh - 280px);">
+                    <!-- Left: Text Editors (1/3 width) -->
+                    <div class="w-1/3 flex flex-col gap-2 overflow-hidden">
+                        <!-- Title Editor -->
+                        <div class="border rounded-lg overflow-hidden flex-shrink-0">
+                            <div class="bg-blue-500 text-white px-3 py-1 text-sm font-semibold flex items-center justify-between">
+                                <div class="flex items-center gap-2">
+                                    <span>Заголовок</span>
+                                    <span class="text-xs opacity-75">(32px)</span>
+                                </div>
+                            </div>
+                            <!-- Compact Toolbar for Title -->
+                            <div class="flex gap-1 flex-wrap bg-blue-50 p-1 border-b items-center">
+                                <button type="button" onclick="formatTextInEditor('editorTitle', 'bold')" class="px-2 py-0.5 bg-white border border-gray-300 rounded hover:bg-gray-100 font-bold text-xs" title="Жирный">B</button>
+                                <button type="button" onclick="formatTextInEditor('editorTitle', 'italic')" class="px-2 py-0.5 bg-white border border-gray-300 rounded hover:bg-gray-100 italic text-xs" title="Курсив">I</button>
+                                <button type="button" onclick="formatTextInEditor('editorTitle', 'underline')" class="px-2 py-0.5 bg-white border border-gray-300 rounded hover:bg-gray-100 underline text-xs" title="Подчёркнутый">U</button>
+                                <input type="color" id="titleTextColor" value="#000000" class="h-6 w-6 rounded border cursor-pointer" onmousedown="saveSelection()" onchange="applyTextColorToEditor('editorTitle', this.value)" title="Цвет текста">
+                                <span class="border-l mx-1 h-4"></span>
+                                <button type="button" onclick="clearFormattingInEditor('editorTitle')" class="px-1 py-0.5 bg-white border border-gray-300 rounded hover:bg-gray-100 text-xs" title="Очистить">✕</button>
+                            </div>
+                            <div id="editorTitle" 
+                                 contenteditable="true"
+                                 class="p-3 min-h-[60px] max-h-[100px] overflow-y-auto focus:outline-none focus:bg-blue-50 text-xl font-bold"
+                                 oninput="syncBlocksToPreview()"
+                                 placeholder="Введите заголовок..."></div>
                         </div>
-                        <div id="editorTitle" 
-                             contenteditable="true"
-                             class="p-3 min-h-[120px] focus:outline-none focus:bg-blue-50 text-xl font-bold overflow-visible"
-                             oninput="syncBlocksToPreview()"
-                             placeholder="Введите заголовок..."></div>
+                        
+                        <!-- Main Text Editor - flexible height with scroll -->
+                        <div class="border rounded-lg overflow-hidden flex-1 flex flex-col min-h-0">
+                            <div class="bg-green-500 text-white px-3 py-1 text-sm font-semibold flex items-center justify-between flex-shrink-0">
+                                <div class="flex items-center gap-2">
+                                    <span>Основной текст</span>
+                                    <span class="text-xs opacity-75">(18px)</span>
+                                </div>
+                            </div>
+                            <!-- Compact Toolbar for Main Text -->
+                            <div class="flex gap-1 flex-wrap bg-green-50 p-1 border-b items-center flex-shrink-0">
+                                <button type="button" onclick="formatTextInEditor('editorMainText', 'bold')" class="px-2 py-0.5 bg-white border border-gray-300 rounded hover:bg-gray-100 font-bold text-xs" title="Жирный">B</button>
+                                <button type="button" onclick="formatTextInEditor('editorMainText', 'italic')" class="px-2 py-0.5 bg-white border border-gray-300 rounded hover:bg-gray-100 italic text-xs" title="Курсив">I</button>
+                                <button type="button" onclick="formatTextInEditor('editorMainText', 'underline')" class="px-2 py-0.5 bg-white border border-gray-300 rounded hover:bg-gray-100 underline text-xs" title="Подчёркнутый">U</button>
+                                <input type="color" id="mainTextColor" value="#000000" class="h-6 w-6 rounded border cursor-pointer" onmousedown="saveSelection()" onchange="applyTextColorToEditor('editorMainText', this.value)" title="Цвет текста">
+                                <span class="border-l mx-1 h-4"></span>
+                                <select onchange="applyListStyleToEditor('editorMainText', 'ul', this.value); this.selectedIndex=0;" class="px-1 py-0.5 bg-white border border-gray-300 rounded text-xs" title="Маркированный список">
+                                    <option value="" disabled selected>•</option>
+                                    <option value="disc">• Круг</option>
+                                    <option value="circle">○ Пустой</option>
+                                    <option value="square">■ Квадрат</option>
+                                    <option value="remove">✕ Убрать</option>
+                                </select>
+                                <select onchange="applyListStyleToEditor('editorMainText', 'ol', this.value); this.selectedIndex=0;" class="px-1 py-0.5 bg-white border border-gray-300 rounded text-xs" title="Нумерованный список">
+                                    <option value="" disabled selected>1.</option>
+                                    <option value="decimal">1, 2, 3</option>
+                                    <option value="lower-alpha">a, b, c</option>
+                                    <option value="upper-alpha">A, B, C</option>
+                                    <option value="remove">✕ Убрать</option>
+                                </select>
+                                <span class="border-l mx-1 h-4"></span>
+                                <button type="button" onclick="clearFormattingInEditor('editorMainText')" class="px-1 py-0.5 bg-white border border-gray-300 rounded hover:bg-gray-100 text-xs" title="Очистить">✕</button>
+                            </div>
+                            <div id="editorMainText" 
+                                 contenteditable="true"
+                                 class="p-3 flex-1 overflow-y-auto focus:outline-none focus:bg-green-50"
+                                 oninput="syncBlocksToPreview()"
+                                 placeholder="Введите основной текст..."></div>
+                        </div>
+                        
+                        <!-- Comment Editor -->
+                        <div class="border rounded-lg overflow-hidden flex-shrink-0">
+                            <div class="bg-gray-500 text-white px-3 py-1 text-sm font-semibold flex items-center justify-between">
+                                <div class="flex items-center gap-2">
+                                    <span>Комментарий</span>
+                                    <span class="text-xs opacity-75">(14px)</span>
+                                </div>
+                            </div>
+                            <!-- Compact Toolbar for Comment -->
+                            <div class="flex gap-1 flex-wrap bg-gray-100 p-1 border-b items-center">
+                                <button type="button" onclick="formatTextInEditor('editorComment', 'bold')" class="px-2 py-0.5 bg-white border border-gray-300 rounded hover:bg-gray-100 font-bold text-xs" title="Жирный">B</button>
+                                <button type="button" onclick="formatTextInEditor('editorComment', 'italic')" class="px-2 py-0.5 bg-white border border-gray-300 rounded hover:bg-gray-100 italic text-xs" title="Курсив">I</button>
+                                <button type="button" onclick="formatTextInEditor('editorComment', 'underline')" class="px-2 py-0.5 bg-white border border-gray-300 rounded hover:bg-gray-100 underline text-xs" title="Подчёркнутый">U</button>
+                                <input type="color" id="commentTextColor" value="#6B7280" class="h-6 w-6 rounded border cursor-pointer" onmousedown="saveSelection()" onchange="applyTextColorToEditor('editorComment', this.value)" title="Цвет текста">
+                                <span class="border-l mx-1 h-4"></span>
+                                <button type="button" onclick="clearFormattingInEditor('editorComment')" class="px-1 py-0.5 bg-white border border-gray-300 rounded hover:bg-gray-100 text-xs" title="Очистить">✕</button>
+                            </div>
+                            <div id="editorComment" 
+                                 contenteditable="true"
+                                 class="p-3 min-h-[50px] max-h-[80px] overflow-y-auto focus:outline-none focus:bg-gray-50 text-sm text-gray-600"
+                                 oninput="syncBlocksToPreview()"
+                                 placeholder="Введите комментарий..."></div>
+                        </div>
                     </div>
                     
-                    <!-- Main Text Editor -->
-                    <div class="border rounded-lg overflow-hidden">
-                        <div class="bg-green-500 text-white px-3 py-1 text-sm font-semibold flex items-center gap-2">
-                            <span>Основной текст</span>
-                            <span class="text-xs opacity-75">(18px)</span>
+                    <!-- Right: Slide Preview with Toolbar (2/3 width) -->
+                    <div class="w-2/3 flex flex-col">
+                        <!-- Toolbar above preview -->
+                        <div class="preview-toolbar flex items-center gap-1 mb-2 p-2 bg-gray-100 rounded-lg flex-wrap">
+                            <!-- Background dropdown -->
+                            <div class="toolbar-dropdown relative">
+                                <button onclick="toggleToolbarDropdown('bgDropdown')" class="toolbar-btn" title="Фон">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                    </svg>
+                                    <span class="text-xs">Фон</span>
+                                </button>
+                                <div id="bgDropdown" class="toolbar-dropdown-content hidden">
+                                    <div class="p-3 w-64">
+                                        <h4 class="font-semibold text-sm mb-2">Фон слайда</h4>
+                                        <div class="space-y-2">
+                                            <label class="flex items-center cursor-pointer hover:bg-gray-50 p-1 rounded">
+                                                <input type="radio" name="bgType" value="none" checked onchange="changeBackgroundType('none')" class="mr-2">
+                                                <span class="text-sm">Без фона (белый)</span>
+                                            </label>
+                                            <label class="flex items-center cursor-pointer hover:bg-gray-50 p-1 rounded">
+                                                <input type="radio" name="bgType" value="solid" onchange="changeBackgroundType('solid')" class="mr-2">
+                                                <span class="text-sm">Однотонный цвет</span>
+                                            </label>
+                                            <label class="flex items-center cursor-pointer hover:bg-gray-50 p-1 rounded">
+                                                <input type="radio" name="bgType" value="gradient" onchange="changeBackgroundType('gradient')" class="mr-2">
+                                                <span class="text-sm">Градиент</span>
+                                            </label>
+                                            <label class="flex items-center cursor-pointer hover:bg-gray-50 p-1 rounded">
+                                                <input type="radio" name="bgType" value="image" onchange="changeBackgroundType('image')" class="mr-2">
+                                                <span class="text-sm">Картинка</span>
+                                            </label>
+                                        </div>
+                                        <!-- Solid color picker -->
+                                        <div id="solidColorPicker" class="hidden mt-3 pt-2 border-t">
+                                            <label class="block text-xs text-gray-600 mb-1">Цвет фона</label>
+                                            <input type="color" id="bgColor" value="#FFFFFF" class="w-full h-10 rounded border cursor-pointer" onchange="updateBackground()">
+                                        </div>
+                                        <!-- Gradient picker -->
+                                        <div id="gradientPicker" class="hidden mt-3 pt-2 border-t space-y-2">
+                                            <div class="flex gap-2">
+                                                <div class="flex-1">
+                                                    <label class="block text-xs text-gray-600 mb-1">Цвет 1</label>
+                                                    <input type="color" id="gradientColor1" value="#667eea" class="w-full h-8 rounded border cursor-pointer" onchange="updateBackground()">
+                                                </div>
+                                                <div class="flex-1">
+                                                    <label class="block text-xs text-gray-600 mb-1">Цвет 2</label>
+                                                    <input type="color" id="gradientColor2" value="#764ba2" class="w-full h-8 rounded border cursor-pointer" onchange="updateBackground()">
+                                                </div>
+                                            </div>
+                                            <select id="gradientDirection" class="w-full p-2 border rounded text-sm" onchange="updateBackground()">
+                                                <option value="to right">Горизонтальный →</option>
+                                                <option value="to bottom">Вертикальный ↓</option>
+                                                <option value="to bottom right">Диагональный ↘</option>
+                                            </select>
+                                        </div>
+                                        <!-- Image background picker -->
+                                        <div id="imageBgPicker" class="hidden mt-3 pt-2 border-t space-y-2">
+                                            <input type="file" id="bgImageInput" accept="image/*" class="hidden" onchange="handleBackgroundImageUpload(event)">
+                                            <button type="button" onclick="document.getElementById('bgImageInput').click()" class="w-full px-2 py-2 bg-green-500 text-white rounded text-sm hover:bg-green-600">
+                                                + Загрузить изображение
+                                            </button>
+                                            <div id="bgImagePreview" class="text-xs text-gray-500"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Font dropdown -->
+                            <div class="toolbar-dropdown relative">
+                                <button onclick="toggleToolbarDropdown('fontDropdown')" class="toolbar-btn" title="Шрифт">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"/>
+                                    </svg>
+                                    <span class="text-xs">Шрифт</span>
+                                </button>
+                                <div id="fontDropdown" class="toolbar-dropdown-content hidden">
+                                    <div class="p-3 w-72">
+                                        <h4 class="font-semibold text-sm mb-2">Настройки шрифта</h4>
+                                        <!-- Font Family -->
+                                        <div class="mb-3">
+                                            <label class="block text-xs text-gray-600 mb-1">Шрифт</label>
+                                            <select id="fontFamily" class="w-full p-2 border border-gray-300 rounded text-sm" onchange="changeFontFamily()">
+                                                <optgroup label="Системные">
+                                                    <option value="Arial" selected>Arial</option>
+                                                    <option value="Times New Roman">Times New Roman</option>
+                                                    <option value="Calibri">Calibri</option>
+                                                    <option value="Georgia">Georgia</option>
+                                                    <option value="Verdana">Verdana</option>
+                                                    <option value="Helvetica">Helvetica</option>
+                                                </optgroup>
+                                                <optgroup label="Google Fonts">
+                                                    <option data-google="true" value="Roboto">Roboto</option>
+                                                    <option data-google="true" value="Open Sans">Open Sans</option>
+                                                    <option data-google="true" value="Montserrat">Montserrat</option>
+                                                    <option data-google="true" value="Poppins">Poppins</option>
+                                                    <option data-google="true" value="Inter">Inter</option>
+                                                    <option data-google="true" value="Playfair Display">Playfair Display</option>
+                                                    <option data-google="true" value="PT Sans">PT Sans</option>
+                                                    <option data-google="true" value="Nunito">Nunito</option>
+                                                </optgroup>
+                                            </select>
+                                        </div>
+                                        <!-- Font Sizes -->
+                                        <div class="space-y-2">
+                                            <div>
+                                                <div class="flex justify-between text-xs mb-1">
+                                                    <span class="text-blue-600">Заголовок</span>
+                                                    <span id="titleFontSizeValue" class="text-gray-600">32px</span>
+                                                </div>
+                                                <input type="range" id="titleFontSize" min="16" max="72" value="32" class="w-full h-2 bg-blue-200 rounded-lg cursor-pointer" oninput="applyBlockFontSize('title', this.value)">
+                                            </div>
+                                            <div>
+                                                <div class="flex justify-between text-xs mb-1">
+                                                    <span class="text-green-600">Основной текст</span>
+                                                    <span id="mainTextFontSizeValue" class="text-gray-600">18px</span>
+                                                </div>
+                                                <input type="range" id="mainTextFontSize" min="10" max="48" value="18" class="w-full h-2 bg-green-200 rounded-lg cursor-pointer" oninput="applyBlockFontSize('mainText', this.value)">
+                                            </div>
+                                            <div>
+                                                <div class="flex justify-between text-xs mb-1">
+                                                    <span class="text-gray-600">Комментарий</span>
+                                                    <span id="commentFontSizeValue" class="text-gray-600">14px</span>
+                                                </div>
+                                                <input type="range" id="commentFontSize" min="8" max="32" value="14" class="w-full h-2 bg-gray-300 rounded-lg cursor-pointer" oninput="applyBlockFontSize('comment', this.value)">
+                                            </div>
+                                        </div>
+                                        <!-- Text Alignment -->
+                                        <div class="mt-3 pt-2 border-t">
+                                            <label class="block text-xs text-gray-600 mb-1">Выравнивание</label>
+                                            <div class="flex gap-1">
+                                                <button id="posHorizLeft" onclick="changeTextPosition(null, 'left')" class="flex-1 p-2 border rounded hover:bg-gray-50 bg-blue-100 border-blue-500" title="По левому краю">
+                                                    <svg class="w-4 h-4 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h10M4 18h14"/></svg>
+                                                </button>
+                                                <button id="posHorizCenter" onclick="changeTextPosition(null, 'center')" class="flex-1 p-2 border rounded hover:bg-gray-50" title="По центру">
+                                                    <svg class="w-4 h-4 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M7 12h10M5 18h14"/></svg>
+                                                </button>
+                                                <button id="posHorizRight" onclick="changeTextPosition(null, 'right')" class="flex-1 p-2 border rounded hover:bg-gray-50" title="По правому краю">
+                                                    <svg class="w-4 h-4 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M10 12h10M6 18h14"/></svg>
+                                                </button>
+                                                <button id="posHorizJustify" onclick="changeTextPosition(null, 'justify')" class="flex-1 p-2 border rounded hover:bg-gray-50" title="По ширине">
+                                                    <svg class="w-4 h-4 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Image upload dropdown -->
+                            <div class="toolbar-dropdown relative">
+                                <button onclick="toggleToolbarDropdown('imageDropdown')" class="toolbar-btn" title="Изображения">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                    </svg>
+                                    <span class="text-xs">Картинка</span>
+                                </button>
+                                <div id="imageDropdown" class="toolbar-dropdown-content hidden">
+                                    <div class="p-3 w-64">
+                                        <h4 class="font-semibold text-sm mb-2">Изображения</h4>
+                                        <input type="file" id="imageUploadInput" accept="image/*" multiple class="hidden" onchange="handleImageUpload(event)">
+                                        <div id="imageDropZone" onclick="document.getElementById('imageUploadInput').click()" 
+                                             class="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors">
+                                            <svg class="w-8 h-8 mx-auto text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                                            </svg>
+                                            <p class="text-sm text-gray-600">Перетащите или кликните</p>
+                                        </div>
+                                        <div id="imagesList" class="space-y-1 max-h-32 overflow-y-auto mt-2">
+                                            <!-- Images will be listed here -->
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Tables dropdown -->
+                            <div class="toolbar-dropdown relative">
+                                <button onclick="toggleToolbarDropdown('tableDropdown')" class="toolbar-btn" title="Таблицы">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                                    </svg>
+                                    <span class="text-xs">Таблица</span>
+                                </button>
+                                <div id="tableDropdown" class="toolbar-dropdown-content hidden">
+                                    <div class="p-3 w-48">
+                                        <h4 class="font-semibold text-sm mb-2">Таблицы</h4>
+                                        <button onclick="showTableModal(); closeAllDropdowns();" class="w-full px-3 py-2 bg-purple-500 text-white rounded text-sm hover:bg-purple-600 mb-2">
+                                            + Добавить таблицу
+                                        </button>
+                                        <div id="tablesList" class="space-y-1 max-h-24 overflow-y-auto">
+                                            <!-- Tables will be listed here -->
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Arrows dropdown -->
+                            <div class="toolbar-dropdown relative">
+                                <button onclick="toggleToolbarDropdown('arrowDropdown')" class="toolbar-btn" title="Стрелки">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/>
+                                    </svg>
+                                    <span class="text-xs">Стрелка</span>
+                                </button>
+                                <div id="arrowDropdown" class="toolbar-dropdown-content hidden">
+                                    <div class="p-3 w-48">
+                                        <h4 class="font-semibold text-sm mb-2">Стрелки</h4>
+                                        <button onclick="showArrowModal(); closeAllDropdowns();" class="w-full px-3 py-2 bg-orange-500 text-white rounded text-sm hover:bg-orange-600 mb-2">
+                                            + Добавить стрелку
+                                        </button>
+                                        <div id="arrowsList" class="space-y-1 max-h-24 overflow-y-auto">
+                                            <!-- Arrows will be listed here -->
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Accent dropdown -->
+                            <div class="toolbar-dropdown relative">
+                                <button onclick="toggleToolbarDropdown('accentDropdown')" class="toolbar-btn" title="Акцент">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                    </svg>
+                                    <span class="text-xs">Акцент</span>
+                                </button>
+                                <div id="accentDropdown" class="toolbar-dropdown-content hidden">
+                                    <div class="p-3 w-48">
+                                        <h4 class="font-semibold text-sm mb-2">Акцентные блоки</h4>
+                                        <button onclick="showAccentBoxModal(); closeAllDropdowns();" class="w-full px-3 py-2 bg-indigo-500 text-white rounded text-sm hover:bg-indigo-600 mb-2">
+                                            + Добавить акцент
+                                        </button>
+                                        <div id="accentBoxesList" class="space-y-1 max-h-24 overflow-y-auto">
+                                            <!-- Accent boxes will be listed here -->
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="flex-1"></div>
+                            
+                            <!-- Page format -->
+                            <select id="pageOrientation" class="p-1.5 border border-gray-300 rounded text-xs bg-white" onchange="applyPageOrientation()">
+                                <option value="16:9">16:9</option>
+                                <option value="4:3">4:3</option>
+                                <option value="1:1">1:1</option>
+                                <option value="9:16">9:16</option>
+                            </select>
+                            
+                            <!-- Apply to all button -->
+                            <button onclick="applyToAll()" class="px-2 py-1.5 bg-blue-500 text-white rounded text-xs hover:bg-blue-600" title="Применить ко всем">
+                                Ко всем
+                            </button>
                         </div>
-                        <div id="editorMainText" 
-                             contenteditable="true"
-                             class="p-3 min-h-[250px] focus:outline-none focus:bg-green-50"
-                             oninput="syncBlocksToPreview()"
-                             placeholder="Введите основной текст..."></div>
-                    </div>
-                    
-                    <!-- Comment Editor -->
-                    <div class="border rounded-lg overflow-hidden">
-                        <div class="bg-gray-500 text-white px-3 py-1 text-sm font-semibold flex items-center gap-2">
-                            <span>Комментарий</span>
-                            <span class="text-xs opacity-75">(14px, серый)</span>
+                        
+                        <!-- Slide Preview -->
+                        <div class="flex-1 flex items-start justify-center overflow-hidden">
+                            <div id="slidePreview" class="border-2 border-blue-400 rounded-lg bg-white relative" style="aspect-ratio: 16/9; width: 100%; max-height: 100%;" onclick="handleSlidePreviewClick(event)">
+                            <!-- Text display container (not editable here) -->
+                            <div id="textLayerContainer" class="absolute inset-0 p-8 flex flex-col" style="z-index: 10;">
+                                <div id="previewTitle" class="font-bold text-3xl text-gray-900 mb-2"></div>
+                                <div id="previewMainText" class="text-lg text-gray-700 flex-1"></div>
+                                <div id="previewComment" class="text-sm text-gray-500 mt-auto"></div>
+                            </div>
+                            <!-- Images layer -->
+                            <div id="previewImages" class="absolute inset-0" style="z-index: 20; pointer-events: none;"></div>
+                            <!-- Arrows layer -->
+                            <div id="previewArrows" class="absolute inset-0" style="z-index: 18; pointer-events: none;"></div>
+                            <!-- Tables layer -->
+                            <div id="previewTables" class="absolute inset-0" style="z-index: 15; pointer-events: none;"></div>
+                            <!-- Accent Boxes layer -->
+                            <div id="previewAccentBoxes" class="absolute inset-0" style="z-index: 12; pointer-events: none;"></div>
+                            </div>
                         </div>
-                        <div id="editorComment" 
-                             contenteditable="true"
-                             class="p-3 min-h-[80px] focus:outline-none focus:bg-gray-50 text-sm text-gray-600"
-                             oninput="syncBlocksToPreview()"
-                             placeholder="Введите комментарий..."></div>
+                        <!-- Dimension Tooltip -->
+                        <div id="dimensionTooltip" class="dimension-tooltip"></div>
                     </div>
                 </div>
             </div>
         </div>
-
-        <!-- Settings Panel (Right) -->
-        <div class="sidebar-panel">
-            <div class="bg-white rounded-lg shadow p-4">
-                <h2 class="text-lg font-bold mb-4">Настройки</h2>
-                
-                <div class="space-y-4">
-                    <!-- Page Orientation -->
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Формат слайда</label>
-                        <select id="pageOrientation" class="w-full p-2 border border-gray-300 rounded-lg" onchange="applyPageOrientation()">
-                            <option value="16:9">Широкоформатный (16:9)</option>
-                            <option value="4:3">Стандартный (4:3)</option>
-                            <option value="1:1">Квадратный (1:1)</option>
-                            <option value="9:16">Вертикальный (9:16)</option>
-                        </select>
-                    </div>
-
-                    <div class="pt-2 border-t">
-                        <h3 class="text-sm font-semibold text-gray-700 mb-3">Размер шрифта</h3>
-                        
-                        <!-- Title Font Size -->
-                        <div class="mb-3">
-                            <div class="flex justify-between items-center mb-1">
-                                <label class="text-xs font-medium text-blue-600">Заголовок</label>
-                                <span id="titleFontSizeValue" class="text-xs text-gray-600">32px</span>
-                            </div>
-                            <input type="range" id="titleFontSize" min="16" max="72" value="32" 
-                                   class="w-full h-2 bg-blue-200 rounded-lg appearance-none cursor-pointer"
-                                   oninput="applyBlockFontSize('title', this.value)">
-                        </div>
-                        
-                        <!-- Main Text Font Size -->
-                        <div class="mb-3">
-                            <div class="flex justify-between items-center mb-1">
-                                <label class="text-xs font-medium text-green-600">Основной текст</label>
-                                <span id="mainTextFontSizeValue" class="text-xs text-gray-600">18px</span>
-                            </div>
-                            <input type="range" id="mainTextFontSize" min="10" max="48" value="18" 
-                                   class="w-full h-2 bg-green-200 rounded-lg appearance-none cursor-pointer"
-                                   oninput="applyBlockFontSize('mainText', this.value)">
-                        </div>
-                        
-                        <!-- Comment Font Size -->
-                        <div>
-                            <div class="flex justify-between items-center mb-1">
-                                <label class="text-xs font-medium text-gray-600">Комментарий</label>
-                                <span id="commentFontSizeValue" class="text-xs text-gray-600">14px</span>
-                            </div>
-                            <input type="range" id="commentFontSize" min="8" max="32" value="14" 
-                                   class="w-full h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer"
-                                   oninput="applyBlockFontSize('comment', this.value)">
-                        </div>
-                    </div>
-
-                    <!-- Font Selection -->
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Шрифт</label>
-                        <select id="fontFamily" class="w-full p-2 border border-gray-300 rounded-lg" onchange="changeFontFamily()">
-                            <optgroup label="Системные шрифты">
-                                <option value="Arial" selected>Arial</option>
-                                <option value="Times New Roman">Times New Roman</option>
-                                <option value="Calibri">Calibri</option>
-                                <option value="Georgia">Georgia</option>
-                                <option value="Verdana">Verdana</option>
-                                <option value="Tahoma">Tahoma</option>
-                                <option value="Trebuchet MS">Trebuchet MS</option>
-                                <option value="Helvetica">Helvetica</option>
-                            </optgroup>
-                            <optgroup label="Google Fonts">
-                                <option data-google="true" value="Roboto">Roboto</option>
-                                <option data-google="true" value="Open Sans">Open Sans</option>
-                                <option data-google="true" value="Lato">Lato</option>
-                                <option data-google="true" value="Montserrat">Montserrat</option>
-                                <option data-google="true" value="Oswald">Oswald</option>
-                                <option data-google="true" value="Raleway">Raleway</option>
-                                <option data-google="true" value="Poppins">Poppins</option>
-                                <option data-google="true" value="Inter">Inter</option>
-                                <option data-google="true" value="Noto Sans">Noto Sans</option>
-                                <option data-google="true" value="Noto Serif">Noto Serif</option>
-                                <option data-google="true" value="Merriweather">Merriweather</option>
-                                <option data-google="true" value="Source Sans 3">Source Sans 3</option>
-                                <option data-google="true" value="Playfair Display">Playfair Display</option>
-                                <option data-google="true" value="PT Sans">PT Sans</option>
-                                <option data-google="true" value="PT Serif">PT Serif</option>
-                                <option data-google="true" value="Ubuntu">Ubuntu</option>
-                                <option data-google="true" value="Work Sans">Work Sans</option>
-                                <option data-google="true" value="Nunito">Nunito</option>
-                                <option data-google="true" value="Quicksand">Quicksand</option>
-                                <option data-google="true" value="Rubik">Rubik</option>
-                                <option data-google="true" value="Heebo">Heebo</option>
-                                <option data-google="true" value="Mulish">Mulish</option>
-                                <option data-google="true" value="Karla">Karla</option>
-                                <option data-google="true" value="IBM Plex Sans">IBM Plex Sans</option>
-                                <option data-google="true" value="DM Sans">DM Sans</option>
-                                <option data-google="true" value="Inconsolata">Inconsolata</option>
-                                <option data-google="true" value="Fira Sans">Fira Sans</option>
-                                <option data-google="true" value="Cabin">Cabin</option>
-                                <option data-google="true" value="Anton">Anton</option>
-                                <option data-google="true" value="Abril Fatface">Abril Fatface</option>
-                                <option data-google="true" value="Arvo">Arvo</option>
-                                <option data-google="true" value="Barlow">Barlow</option>
-                                <option data-google="true" value="Cormorant Garamond">Cormorant Garamond</option>
-                                <option data-google="true" value="Exo 2">Exo 2</option>
-                                <option data-google="true" value="Josefin Sans">Josefin Sans</option>
-                                <option data-google="true" value="Libre Baskerville">Libre Baskerville</option>
-                                <option data-google="true" value="Manrope">Manrope</option>
-                                <option data-google="true" value="Merriweather Sans">Merriweather Sans</option>
-                                <option data-google="true" value="Righteous">Righteous</option>
-                                <option data-google="true" value="Roboto Condensed">Roboto Condensed</option>
-                                <option data-google="true" value="Roboto Slab">Roboto Slab</option>
-                                <option data-google="true" value="Source Serif 4">Source Serif 4</option>
-                                <option data-google="true" value="Tangerine">Tangerine</option>
-                                <option data-google="true" value="Teko">Teko</option>
-                            </optgroup>
-                        </select>
-                    </div>
-
-                    <!-- Text Alignment -->
-                    <div class="pt-2 border-t">
-                        <h3 class="text-sm font-semibold text-gray-700 mb-2">Выравнивание текста</h3>
-                        
-                        <!-- Horizontal Alignment -->
-                        <div class="mb-3">
-                            <label class="block text-xs text-gray-600 mb-1">По горизонтали</label>
-                            <div class="flex gap-1">
-                                <button id="posHorizLeft" onclick="changeTextPosition(null, 'left')" 
-                                        class="flex-1 p-2 border rounded text-sm hover:bg-gray-50 bg-blue-100 border-blue-500" title="По левому краю">
-                                    <svg class="w-4 h-4 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h10M4 18h14"/>
-                                    </svg>
-                                </button>
-                                <button id="posHorizCenter" onclick="changeTextPosition(null, 'center')" 
-                                        class="flex-1 p-2 border rounded text-sm hover:bg-gray-50" title="По центру">
-                                    <svg class="w-4 h-4 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M7 12h10M5 18h14"/>
-                                    </svg>
-                                </button>
-                                <button id="posHorizRight" onclick="changeTextPosition(null, 'right')" 
-                                        class="flex-1 p-2 border rounded text-sm hover:bg-gray-50" title="По правому краю">
-                                    <svg class="w-4 h-4 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M10 12h10M6 18h14"/>
-                                    </svg>
-                                </button>
-                            </div>
-                        </div>
-                        
-                        <!-- Vertical Alignment (hidden for now) -->
-                        <div class="hidden">
-                            <label class="block text-xs text-gray-600 mb-1">По вертикали</label>
-                            <div class="flex gap-1">
-                                <button id="posVertTop" onclick="changeTextPosition('top', null)" 
-                                        class="flex-1 p-2 border rounded text-sm hover:bg-gray-50 bg-blue-100 border-blue-500" title="Сверху">
-                                    <svg class="w-4 h-4 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 4h14M12 8v12"/>
-                                    </svg>
-                                </button>
-                                <button id="posVertCenter" onclick="changeTextPosition('center', null)" 
-                                        class="flex-1 p-2 border rounded text-sm hover:bg-gray-50" title="По центру">
-                                    <svg class="w-4 h-4 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 12h16M12 6v12"/>
-                                    </svg>
-                                </button>
-                                <button id="posVertBottom" onclick="changeTextPosition('bottom', null)" 
-                                        class="flex-1 p-2 border rounded text-sm hover:bg-gray-50" title="Снизу">
-                                    <svg class="w-4 h-4 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 20h14M12 4v12"/>
-                                    </svg>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Slide Background -->
-                    <div class="pt-2 border-t">
-                        <h3 class="text-sm font-semibold text-gray-700 mb-2">Фон слайда</h3>
-                        <div class="space-y-2">
-                            <label class="flex items-center">
-                                <input type="radio" name="bgType" value="none" checked onchange="changeBackgroundType('none')" class="mr-2">
-                                <span class="text-sm">Без фона (белый)</span>
-                            </label>
-                            <label class="flex items-center">
-                                <input type="radio" name="bgType" value="solid" onchange="changeBackgroundType('solid')" class="mr-2">
-                                <span class="text-sm">Однотонный цвет</span>
-                            </label>
-                            <label class="flex items-center">
-                                <input type="radio" name="bgType" value="gradient" onchange="changeBackgroundType('gradient')" class="mr-2">
-                                <span class="text-sm">Градиент</span>
-                            </label>
-                            <label class="flex items-center">
-                                <input type="radio" name="bgType" value="image" onchange="changeBackgroundType('image')" class="mr-2">
-                                <span class="text-sm">Картинка</span>
-                            </label>
-                        </div>
-                        
-                        <!-- Solid color picker -->
-                        <div id="solidColorPicker" class="hidden mt-2">
-                            <label class="block text-xs text-gray-600 mb-1">Цвет фона</label>
-                            <input type="color" id="bgColor" value="#FFFFFF" class="w-full h-10 rounded border" onchange="updateBackground()">
-                        </div>
-                        
-                        <!-- Gradient picker -->
-                        <div id="gradientPicker" class="hidden mt-2 space-y-2">
-                            <div class="flex gap-2">
-                                <div class="flex-1">
-                                    <label class="block text-xs text-gray-600 mb-1">Цвет 1</label>
-                                    <input type="color" id="gradientColor1" value="#667eea" class="w-full h-8 rounded border" onchange="updateBackground()">
-                                </div>
-                                <div class="flex-1">
-                                    <label class="block text-xs text-gray-600 mb-1">Цвет 2</label>
-                                    <input type="color" id="gradientColor2" value="#764ba2" class="w-full h-8 rounded border" onchange="updateBackground()">
-                                </div>
-                            </div>
-                            <select id="gradientDirection" class="w-full p-2 border rounded text-sm" onchange="updateBackground()">
-                                <option value="to right">Горизонтальный →</option>
-                                <option value="to bottom">Вертикальный ↓</option>
-                                <option value="to bottom right">Диагональный ↘</option>
-                            </select>
-                        </div>
-                        
-                        <!-- Image background picker -->
-                        <div id="imageBgPicker" class="hidden mt-2 space-y-2">
-                            <label class="block text-xs text-gray-600 mb-1">Фоновое изображение</label>
-                            <input type="file" id="bgImageInput" accept="image/*" class="hidden" onchange="handleBackgroundImageUpload(event)">
-                            <button type="button" onclick="document.getElementById('bgImageInput').click()" class="w-full px-2 py-1 bg-green-500 text-white rounded text-xs hover:bg-green-600 mb-1">
-                                + Загрузить фоновое изображение
-                            </button>
-                            <div id="bgImagePreview" class="text-xs text-gray-500"></div>
-                        </div>
-                    </div>
-
-                    <!-- Element Management -->
-                    <div class="pt-2 border-t">
-                        <h3 class="text-sm font-semibold text-gray-700 mb-2">Элементы</h3>
-                    </div>
-
-                    <!-- Text Blocks -->
-                    <div>
-                        <h4 class="text-xs font-medium text-gray-600 mb-1">Текстовые блоки</h4>
-                        <div class="flex gap-1 mb-2">
-                            <button onclick="addTextBlock('header')" class="flex-1 px-2 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600" title="Заголовок">
-                                Заголовок
-                            </button>
-                            <button onclick="addTextBlock('text')" class="flex-1 px-2 py-1 bg-green-500 text-white rounded text-xs hover:bg-green-600" title="Основной текст">
-                                Текст
-                            </button>
-                            <button onclick="addTextBlock('comment')" class="flex-1 px-2 py-1 bg-gray-500 text-white rounded text-xs hover:bg-gray-600" title="Комментарий">
-                                Коммент.
-                            </button>
-                        </div>
-                        <div id="textBlocksList" class="space-y-1 max-h-24 overflow-y-auto">
-                            <!-- Text blocks will be listed here -->
-                        </div>
-                    </div>
-
-                    <!-- Images -->
-                    <div>
-                        <h4 class="text-xs font-medium text-gray-600 mb-1">Изображения</h4>
-                        <input type="file" id="imageUploadInput" accept="image/*" multiple class="hidden" onchange="handleImageUpload(event)">
-                        <button onclick="document.getElementById('imageUploadInput').click()" class="w-full px-2 py-1 bg-green-500 text-white rounded text-xs hover:bg-green-600 mb-2">
-                            + Загрузить изображение
-                        </button>
-                        <div id="imagesList" class="space-y-1 max-h-32 overflow-y-auto mb-2">
-                            <!-- Images will be listed here -->
-                        </div>
-                        <p class="text-xs text-gray-500">Или Drag & Drop на превью</p>
-                    </div>
-
-                    <!-- Tables -->
-                    <div class="mt-3">
-                        <h4 class="text-xs font-medium text-gray-600 mb-1">Таблицы</h4>
-                        <button onclick="showTableModal()" class="w-full px-2 py-1 bg-purple-500 text-white rounded text-xs hover:bg-purple-600 mb-1">
-                            + Добавить
-                        </button>
-                        <div id="tablesList" class="space-y-1 max-h-20 overflow-y-auto">
-                            <!-- Tables will be listed here -->
-                        </div>
-                    </div>
-
-                    <!-- Arrows -->
-                    <div class="mt-3">
-                        <h4 class="text-xs font-medium text-gray-600 mb-1">Стрелки</h4>
-                        <button onclick="showArrowModal()" class="w-full px-2 py-1 bg-orange-500 text-white rounded text-xs hover:bg-orange-600 mb-1">
-                            + Добавить
-                        </button>
-                        <div id="arrowsList" class="space-y-1 max-h-20 overflow-y-auto">
-                            <!-- Arrows will be listed here -->
-                        </div>
-                    </div>
-
-                    <!-- Accent Boxes -->
-                    <div class="mt-3">
-                        <h4 class="text-xs font-medium text-gray-600 mb-1">Акцентные блоки</h4>
-                        <button onclick="showAccentBoxModal()" class="w-full px-2 py-1 bg-indigo-500 text-white rounded text-xs hover:bg-indigo-600 mb-1">
-                            + Добавить
-                        </button>
-                        <div id="accentBoxesList" class="space-y-1 max-h-20 overflow-y-auto">
-                            <!-- Accent boxes will be listed here -->
-                        </div>
-                    </div>
-
-                    <div class="pt-4 border-t">
-                        <button onclick="applyToAll()" class="w-full px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm">
-                            Применить ко всем
-                        </button>
-                    </div>
-                </div>
-            </div>
+        
+        <!-- Hidden vertical alignment buttons (for JS compatibility) -->
+        <div class="hidden">
+            <button id="posVertTop"></button>
+            <button id="posVertCenter"></button>
+            <button id="posVertBottom"></button>
         </div>
     </div>
 </div>
@@ -1355,6 +1392,72 @@ function getActiveEditor() {
     return document.getElementById(activeEditorId) || document.getElementById('editorMainText');
 }
 
+// Toolbar dropdown functions
+function toggleToolbarDropdown(dropdownId) {
+    const dropdown = document.getElementById(dropdownId);
+    if (!dropdown) return;
+    
+    const wasHidden = dropdown.classList.contains('hidden');
+    
+    // Close all dropdowns first
+    closeAllDropdowns();
+    
+    // Toggle this one
+    if (wasHidden) {
+        dropdown.classList.remove('hidden');
+    }
+}
+
+function closeAllDropdowns() {
+    const dropdowns = document.querySelectorAll('.toolbar-dropdown-content');
+    dropdowns.forEach(d => d.classList.add('hidden'));
+}
+
+// Close dropdowns when clicking outside
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.toolbar-dropdown')) {
+        closeAllDropdowns();
+    }
+});
+
+// Setup image drop zone drag & drop
+function setupImageDropZone() {
+    const dropZone = document.getElementById('imageDropZone');
+    if (!dropZone) return;
+    
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('drag-over');
+    });
+    
+    dropZone.addEventListener('dragleave', () => {
+        dropZone.classList.remove('drag-over');
+    });
+    
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('drag-over');
+        
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            handleImageFiles(files);
+        }
+    });
+}
+
+function handleImageFiles(files) {
+    for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        if (file.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                addImageToSlide(e.target.result, file.name);
+            };
+            reader.readAsDataURL(file);
+        }
+    }
+}
+
 function saveSelection() {
     const selection = window.getSelection();
     if (selection.rangeCount > 0) {
@@ -1433,6 +1536,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     // Setup responsive scaling
     setupResponsiveScaling();
+    
+    // Setup image drop zone
+    setupImageDropZone();
 });
 
 function checkForGeneratedPresentation(jobId) {
@@ -1453,48 +1559,20 @@ function checkForGeneratedPresentation(jobId) {
 function renderSlidesList() {
     const container = document.getElementById('slidesList');
     if (slides.length === 0) {
-        container.innerHTML = '<div class="p-4 text-gray-500 text-sm">Нет слайдов</div>';
+        container.innerHTML = '<div class="p-2 text-gray-500 text-sm">Нет слайдов</div>';
         return;
     }
-    container.innerHTML = slides.map((slide, index) => {
-        // Extract title and preview
-        let title = 'Без заголовка';
-        let preview = '';
-        
-        // New 3-block format
-        if (slide.titleText) {
-            const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = slide.titleText;
-            title = tempDiv.textContent.substring(0, 30) || 'Без заголовка';
-        }
-        if (slide.mainTextContent) {
-            const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = slide.mainTextContent;
-            preview = tempDiv.textContent.replace(/\s+/g, ' ').trim().substring(0, 30);
-        }
-        
-        // Fallback to old format
-        if (!slide.titleText && slide.content) {
-            const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = slide.content;
-            const heading = tempDiv.querySelector('h1, h2, h3, h4');
-            if (heading) {
-                title = heading.textContent.substring(0, 30);
-            }
-            preview = tempDiv.textContent.replace(/\s+/g, ' ').trim().substring(0, 30);
-        } else if (!slide.titleText && slide.title) {
-            title = slide.title;
-            preview = (slide.mainText || '').replace(/<[^>]*>/g, '').substring(0, 30);
-        }
-        
-        return `
-        <div onclick="loadSlide(${index})" 
-             class="p-3 rounded cursor-pointer transition ${index === currentSlideIndex ? 'bg-blue-100 border-2 border-blue-500' : 'bg-gray-50 hover:bg-gray-100 border border-gray-200'}">
-            <div class="font-semibold text-sm">${index + 1}. ${title}</div>
-            <div class="text-xs text-gray-500 mt-1 truncate">${preview}${preview ? '...' : ''}</div>
-        </div>
-    `;
+    
+    // Render horizontal buttons with slide numbers
+    let buttonsHtml = slides.map((slide, index) => {
+        const isActive = index === currentSlideIndex ? 'active' : '';
+        return `<button onclick="loadSlide(${index})" class="slide-btn ${isActive}" title="Слайд ${index + 1}">${index + 1}</button>`;
     }).join('');
+    
+    // Add "New slide" button at the end
+    buttonsHtml += `<button onclick="addNewSlide()" class="slide-btn slide-btn-add" title="Добавить слайд">+</button>`;
+    
+    container.innerHTML = buttonsHtml;
 }
 
 function loadSlide(index) {
@@ -1862,32 +1940,43 @@ function formatMainText(text) {
 function updatePreviewStyles() {
     const fontFamily = document.getElementById('fontFamily').value;
     
-    const editor = getActiveEditor();
-    if (editor) {
-        // Apply font family to all content in the editor
-        editor.style.fontFamily = fontFamily;
-        
-        // Apply text alignment
-        const textPosition = presentationSettings.defaultTextPosition || { vertical: 'top', horizontal: 'left' };
-        
-        // Horizontal alignment (text-align)
-        const hAlignMap = { left: 'left', center: 'center', right: 'right' };
-        editor.style.textAlign = hAlignMap[textPosition.horizontal] || 'left';
-        
-        // Vertical alignment using flexbox
-        const vAlignMap = { top: 'flex-start', center: 'center', bottom: 'flex-end' };
-        editor.style.display = 'flex';
-        editor.style.flexDirection = 'column';
-        editor.style.justifyContent = vAlignMap[textPosition.vertical] || 'flex-start';
-        
-        // Also apply font family to all existing elements to ensure consistency
-        const allElements = editor.querySelectorAll('*');
-        allElements.forEach(el => {
-            // Only set font-family if it's not already explicitly set
-            if (!el.style.fontFamily) {
+    // Apply font family to ALL editor blocks
+    const editorIds = ['editorTitle', 'editorMainText', 'editorComment'];
+    editorIds.forEach(editorId => {
+        const editor = document.getElementById(editorId);
+        if (editor) {
+            editor.style.fontFamily = fontFamily;
+            
+            // Also apply to all child elements
+            const allElements = editor.querySelectorAll('*');
+            allElements.forEach(el => {
                 el.style.fontFamily = fontFamily;
-            }
-        });
+            });
+        }
+    });
+    
+    // Apply font family to ALL preview blocks
+    const previewIds = ['previewTitle', 'previewMainText', 'previewComment'];
+    previewIds.forEach(previewId => {
+        const preview = document.getElementById(previewId);
+        if (preview) {
+            preview.style.fontFamily = fontFamily;
+            
+            // Also apply to all child elements
+            const allElements = preview.querySelectorAll('*');
+            allElements.forEach(el => {
+                el.style.fontFamily = fontFamily;
+            });
+        }
+    });
+    
+    // Apply text alignment from presentationSettings
+    const textPosition = presentationSettings.defaultTextPosition || { vertical: 'top', horizontal: 'left' };
+    
+    // Apply horizontal alignment to text container
+    const textContainer = document.getElementById('textLayerContainer');
+    if (textContainer) {
+        textContainer.style.textAlign = textPosition.horizontal || 'left';
     }
 }
 
@@ -2283,45 +2372,42 @@ function applyPageOrientation() {
     
     // Define aspect ratios
     const aspectRatios = {
-        '16:9': { ratio: '16/9', isVertical: false },
-        '4:3': { ratio: '4/3', isVertical: false },
-        '1:1': { ratio: '1/1', isVertical: false },
-        '9:16': { ratio: '9/16', isVertical: true },
+        '16:9': '16/9',
+        '4:3': '4/3',
+        '1:1': '1/1',
+        '9:16': '9/16',
         // Legacy support
-        'horizontal': { ratio: '16/9', isVertical: false },
-        'vertical': { ratio: '9/16', isVertical: true }
+        'horizontal': '16/9',
+        'vertical': '9/16'
     };
     
-    const config = aspectRatios[orientation] || aspectRatios['16:9'];
+    const ratio = aspectRatios[orientation] || aspectRatios['16:9'];
     
-    preview.style.aspectRatio = config.ratio;
+    // Reset all styles first
+    preview.style.width = '';
+    preview.style.height = '';
+    preview.style.maxWidth = '';
+    preview.style.maxHeight = '';
     
-    if (config.isVertical) {
-        // Vertical: keep height constrained and derive width from aspect ratio
-        preview.style.height = '60vh';
-        preview.style.maxHeight = '60vh';
-        preview.style.width = 'auto';
-        preview.style.maxWidth = '100%';
-        preview.style.display = 'inline-block';
-        preview.style.marginLeft = 'auto';
-        preview.style.marginRight = 'auto';
-    } else if (orientation === '1:1') {
-        // Square: constrain by height to fit in view
-        preview.style.height = '50vh';
-        preview.style.maxHeight = '50vh';
-        preview.style.width = 'auto';
-        preview.style.maxWidth = '100%';
-        preview.style.display = 'inline-block';
-        preview.style.marginLeft = 'auto';
-        preview.style.marginRight = 'auto';
-    } else {
-        // Landscape: fill width but cap height
-        preview.style.height = 'auto';
-        preview.style.maxHeight = '60vh';
+    // Set the aspect ratio
+    preview.style.aspectRatio = ratio;
+    
+    // For horizontal formats (16:9, 4:3), use full width
+    if (orientation === '16:9' || orientation === '4:3' || orientation === 'horizontal') {
         preview.style.width = '100%';
-        preview.style.display = 'block';
-        preview.style.marginLeft = '';
-        preview.style.marginRight = '';
+        preview.style.height = 'auto';
+    }
+    // For square (1:1), constrain by height
+    else if (orientation === '1:1') {
+        preview.style.width = 'auto';
+        preview.style.height = '100%';
+        preview.style.maxWidth = '100%';
+    }
+    // For vertical (9:16), constrain by height
+    else if (orientation === '9:16' || orientation === 'vertical') {
+        preview.style.width = 'auto';
+        preview.style.height = '100%';
+        preview.style.maxWidth = '100%';
     }
     
     saveSettings();
@@ -2454,7 +2540,7 @@ function updateAlignmentButtons(vertical, horizontal) {
     }
     
     // Update horizontal buttons
-    ['posHorizLeft', 'posHorizCenter', 'posHorizRight'].forEach(id => {
+    ['posHorizLeft', 'posHorizCenter', 'posHorizRight', 'posHorizJustify'].forEach(id => {
         const btn = document.getElementById(id);
         if (btn) {
             btn.classList.remove('bg-blue-100', 'border-blue-500');
@@ -2463,7 +2549,8 @@ function updateAlignmentButtons(vertical, horizontal) {
     });
     if (horizontal) {
         const hBtnId = horizontal === 'left' ? 'posHorizLeft' : 
-                       horizontal === 'center' ? 'posHorizCenter' : 'posHorizRight';
+                       horizontal === 'center' ? 'posHorizCenter' : 
+                       horizontal === 'justify' ? 'posHorizJustify' : 'posHorizRight';
         const hBtn = document.getElementById(hBtnId);
         if (hBtn) {
             hBtn.classList.add('bg-blue-100', 'border-blue-500');
@@ -2744,6 +2831,118 @@ function formatText(command) {
         document.execCommand(command, false, null);
         syncContentToData();
     }
+}
+
+// Format text in a specific editor
+function formatTextInEditor(editorId, command) {
+    const editor = document.getElementById(editorId);
+    if (!editor) return;
+    
+    // Focus the editor first
+    editor.focus();
+    
+    // Apply the formatting command
+    document.execCommand(command, false, null);
+    
+    // Sync to preview
+    syncBlocksToPreview();
+}
+
+// Apply text color to a specific editor
+function applyTextColorToEditor(editorId, color) {
+    const editor = document.getElementById(editorId);
+    if (!editor) return;
+    
+    // Restore any saved selection first
+    if (savedSelection) {
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(savedSelection);
+    }
+    
+    // Focus the editor
+    editor.focus();
+    
+    // Check if there's any selection
+    const selection = window.getSelection();
+    if (selection.rangeCount === 0 || selection.isCollapsed) {
+        // No selection - apply to the whole editor content
+        const range = document.createRange();
+        range.selectNodeContents(editor);
+        selection.removeAllRanges();
+        selection.addRange(range);
+    }
+    
+    // Apply color
+    document.execCommand('foreColor', false, color);
+    
+    // Sync to preview
+    syncBlocksToPreview();
+}
+
+// Clear formatting in a specific editor
+function clearFormattingInEditor(editorId) {
+    const editor = document.getElementById(editorId);
+    if (!editor) return;
+    
+    // Focus the editor
+    editor.focus();
+    
+    // Remove formatting
+    document.execCommand('removeFormat', false, null);
+    
+    // Sync to preview
+    syncBlocksToPreview();
+}
+
+// Apply list style to a specific editor
+function applyListStyleToEditor(editorId, listType, listStyle) {
+    const editor = document.getElementById(editorId);
+    if (!editor) return;
+    
+    // Focus the editor
+    editor.focus();
+    
+    if (listStyle === 'remove') {
+        // Remove list formatting
+        const selection = window.getSelection();
+        if (!selection.rangeCount) return;
+        
+        const range = selection.getRangeAt(0);
+        let node = range.commonAncestorContainer;
+        
+        while (node && node !== editor) {
+            if (node.tagName === 'UL' || node.tagName === 'OL') {
+                const command = node.tagName === 'UL' ? 'insertUnorderedList' : 'insertOrderedList';
+                document.execCommand(command, false, null);
+                break;
+            }
+            node = node.parentNode;
+        }
+    } else {
+        // Apply list
+        const command = listType === 'ul' ? 'insertUnorderedList' : 'insertOrderedList';
+        document.execCommand(command, false, null);
+        
+        // Apply style
+        setTimeout(() => {
+            const selection = window.getSelection();
+            if (!selection.anchorNode) return;
+            
+            let node = selection.anchorNode;
+            while (node && node !== editor) {
+                if (node.tagName === 'UL' || node.tagName === 'OL') {
+                    node.style.listStyleType = listStyle;
+                    break;
+                }
+                node = node.parentNode;
+            }
+            syncBlocksToPreview();
+        }, 10);
+    }
+    
+    // Sync to preview
+    syncBlocksToPreview();
 }
 
 // Selection preservation - using the version from auto-save feature above (line 1168)
@@ -3144,9 +3343,7 @@ function applyBlockFontSize(blockType, size) {
     const editor = document.getElementById(editorIds[blockType]);
     if (editor) {
         editor.style.fontSize = sizeInt + 'px';
-        // Auto-expand min-height based on font size (at least 2 lines + padding)
-        const minHeight = Math.max(sizeInt * 2.5 + 24, blockType === 'mainText' ? 250 : 80);
-        editor.style.minHeight = minHeight + 'px';
+        // Don't override min-height for mainText as it uses flex layout
     }
     
     // Apply to preview

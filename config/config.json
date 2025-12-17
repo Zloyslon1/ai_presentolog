@@ -2,6 +2,7 @@
   "authentication": {
     "client_secrets_path": "credentials/client_secret.json",
     "token_path": "credentials/token.json",
+    "api_key": "AIzaSyCEjRhdYmrzgT3_OIGVGSL_lNysbbOZmiY",
     "scopes": [
       "https://www.googleapis.com/auth/presentations",
       "https://www.googleapis.com/auth/presentations.readonly",

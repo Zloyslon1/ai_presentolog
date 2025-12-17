@@ -1,169 +1,260 @@
-# Automated Presentation Design System
+# AI Presentolog Documentation
 
-## Phase 1: Core Design Engine
+Welcome to the AI Presentolog documentation! This guide will help you understand, install, and use the automated Google Slides presentation designer.
 
-A Python-based system for automatically extracting content from Google Slides presentations, applying professional design templates, and generating styled presentations.
+---
 
-## Features
+## 📚 Documentation Structure
 
-- **OAuth 2.0 Authentication**: Secure Google API access with token management
-- **Content Extraction**: Parse presentation structure and text from Google Slides
-- **Template System**: JSON-based design templates with typography, colors, and layouts
-- **Design Application**: Apply templates to preserve content while enhancing visual design
-- **Presentation Generation**: Create new Google Slides presentations with applied designs
-- **Error Handling**: Comprehensive logging and retry logic for API operations
+### Getting Started
+Perfect for first-time users and installation.
 
-## Project Structure
+- **[Installation Guide](getting-started/installation.md)** - Complete setup instructions from scratch
+- **[Authentication Guide](getting-started/authentication.md)** - Configure Google OAuth and Service Accounts
+- **[Quick Start](getting-started/quick-start.md)** - Get running in 5-10 minutes
+- **[OAuth Setup Guide](getting-started/SETUP_OAUTH_GUIDE.md)** - Detailed OAuth configuration steps
+- **[Service Account Setup](getting-started/SETUP_SERVICE_ACCOUNT.md)** - Optional server-side authentication
+- **[Service Account Quickstart](getting-started/QUICKSTART_SERVICE_ACCOUNT.md)** - Fast Service Account setup
 
-```
-presentation_design/
-├── auth/                   # Authentication and credentials management
-├── extraction/             # Content extraction from Google Slides
-├── templates/              # Template management and validation
-│   └── designs/           # Design template files (JSON)
-├── design/                 # Design application logic
-├── generation/             # Presentation building
-└── utils/                  # Configuration, logging, retry logic
+### User Guide
+Everything you need to use AI Presentolog effectively.
 
-config/                     # Configuration files
-credentials/                # OAuth credentials (gitignored)
-logs/                       # Application logs
-```
+- **[Web Interface](user-guide/web-interface.md)** - Complete web application guide
+- **[Slide Editor](user-guide/slide-editor.md)** - Interactive WYSIWYG editor features
+- **[Templates](user-guide/templates.md)** - Understanding and using design templates
+- **[Troubleshooting](user-guide/troubleshooting.md)** - Common issues and solutions
+- **[OAuth Guide](user-guide/README_OAUTH.md)** - Comprehensive OAuth documentation
 
-## Installation
+### Developer Guide
+For developers who want to extend or contribute to the project.
 
-### Prerequisites
+- **Architecture** - System design and components (coming soon)
+- **API Reference** - Python API documentation (coming soon)
+- **Template Development** - Creating custom templates (coming soon)
+- **Contributing** - Development guidelines (coming soon)
 
-- Python 3.8 or higher
-- Google Cloud project with Slides API enabled
-- OAuth 2.0 credentials from Google Cloud Console
+### Deployment
+Deploy AI Presentolog to production servers.
 
-### Setup Steps
+- **[Local Deployment](deployment/local-deployment.md)** - Running locally (coming soon)
+- **[Production Deployment](deployment/production.md)** - Production guide (coming soon)
+- **[Web App Guide](deployment/WEB_APP.md)** - Flask application overview
+- **[Deploy Guide](deployment/DEPLOY.md)** - Deployment instructions
 
-1. **Install dependencies:**
-   ```bash
-   pip install -r requirements.txt
-   ```
+### Implementation History
+Historical logs and implementation documents (archived).
 
-2. **Configure Google Cloud:**
-   - Go to [Google Cloud Console](https://console.cloud.google.com/)
-   - Create a new project or select existing
-   - Enable Google Slides API and Google Drive API
-   - Create OAuth 2.0 credentials (Desktop application)
-   - Download credentials as `client_secret.json`
+- **[Implementation History](implementation-history/)** - Archived development logs
 
-3. **Place credentials:**
-   ```bash
-   mkdir -p credentials
-   # Copy your downloaded client_secret.json to credentials/
-   ```
+---
 
-4. **Verify configuration:**
-   - Review `config/config.json`
-   - Adjust paths and settings as needed
+## 🚀 Quick Links
 
-## Usage
+### I'm New Here
+1. Start with [Quick Start Guide](getting-started/quick-start.md)
+2. Follow [Installation Guide](getting-started/installation.md) if you need details
+3. Set up [Authentication](getting-started/authentication.md)
 
-### Command Line
+### I Need Help
+1. Check [Troubleshooting Guide](user-guide/troubleshooting.md)
+2. Review [Web Interface Guide](user-guide/web-interface.md)
+3. Read [Authentication Guide](getting-started/authentication.md) for OAuth issues
 
-**Process a presentation:**
-```bash
-python -m presentation_design.main <presentation_url> -t corporate_blue
-```
+### I Want to Use Features
+1. Learn the [Slide Editor](user-guide/slide-editor.md)
+2. Explore [Templates](user-guide/templates.md)
+3. Master the [Web Interface](user-guide/web-interface.md)
 
-**List available templates:**
-```bash
-python -m presentation_design.main --list-templates
-```
+### I Want to Develop
+1. Review Architecture guide (coming soon)
+2. Read API Reference (coming soon)
+3. Learn Template Development (coming soon)
 
-**Specify custom configuration:**
-```bash
-python -m presentation_design.main <presentation_url> -c path/to/config.json
-```
+---
 
-### Python API
+## 📖 Documentation by Task
 
-```python
-from presentation_design.main import process_presentation
+### Installation Tasks
 
-result = process_presentation(
-    presentation_url="https://docs.google.com/presentation/d/YOUR_ID/edit",
-    template_name="corporate_blue"
-)
+| Task | Guide |
+|------|-------|
+| Install from scratch | [Installation Guide](getting-started/installation.md) |
+| Quick 5-minute setup | [Quick Start](getting-started/quick-start.md) |
+| Set up Google OAuth | [OAuth Setup](getting-started/SETUP_OAUTH_GUIDE.md) |
+| Configure Service Account | [Service Account Setup](getting-started/SETUP_SERVICE_ACCOUNT.md) |
 
-print(f"New presentation: {result['presentation_url']}")
-```
+### Usage Tasks
 
-## Configuration
+| Task | Guide |
+|------|-------|
+| Process a presentation | [Web Interface](user-guide/web-interface.md) |
+| Edit slides | [Slide Editor](user-guide/slide-editor.md) |
+| Apply templates | [Templates Guide](user-guide/templates.md) |
+| Fix problems | [Troubleshooting](user-guide/troubleshooting.md) |
 
-Edit `config/config.json` to customize:
+### Advanced Tasks
 
-- **Authentication**: OAuth credentials paths and scopes
-- **Templates**: Template directory and default template
-- **Processing**: Retry counts and timeouts
-- **Logging**: Log level, format, and retention
+| Task | Guide |
+|------|-------|
+| Deploy to production | [Production Deployment](deployment/production.md) |
+| Create custom templates | Developer Guide (coming soon) |
+| Use Python API | API Reference (coming soon) |
+| Contribute code | Contributing Guide (coming soon) |
 
-## Templates
+---
 
-Templates are JSON files in `presentation_design/templates/designs/`.
+## 🎯 Common Scenarios
 
-**Available templates:**
-- `default` - Simple black and white template
-- `corporate_blue` - Professional blue color scheme
+### Scenario 1: First-Time Setup
 
-**Create custom templates:**
-See `docs/template_guide.md` for template structure documentation.
+**Goal:** Install and run AI Presentolog for the first time
 
-## Authentication Flow
+**Follow these guides in order:**
+1. [Installation Guide](getting-started/installation.md) - Install dependencies
+2. [OAuth Setup](getting-started/SETUP_OAUTH_GUIDE.md) - Configure Google Cloud
+3. [Quick Start](getting-started/quick-start.md) - First run
 
-On first run:
-1. Application opens browser for Google OAuth consent
-2. Grant access to Google Slides and Drive
-3. Credentials saved to `credentials/token.json`
-4. Subsequent runs use saved credentials
+**Time required:** 15-20 minutes
 
-To re-authenticate:
-```bash
-# Delete token file and run again
-rm credentials/token.json
-```
+---
 
-## Logging
+### Scenario 2: Process Your First Presentation
 
-Logs are written to `logs/` directory:
-- JSON format for automated processing
-- Console output for real-time monitoring
-- Automatic daily rotation
-- 30-day retention (configurable)
+**Goal:** Convert an existing Google Slides presentation
 
-## Troubleshooting
+**Follow these guides:**
+1. [Web Interface](user-guide/web-interface.md) - Submit URL
+2. [Slide Editor](user-guide/slide-editor.md) - Edit content
+3. [Templates](user-guide/templates.md) - Apply design
 
-**Authentication errors:**
-- Verify `client_secret.json` is valid
-- Check API is enabled in Google Cloud Console
-- Delete `credentials/token.json` and re-authenticate
+**Time required:** 5-10 minutes
 
-**API quota exceeded:**
-- System will automatically retry after quota resets
-- Consider requesting quota increase in Google Cloud Console
+---
 
-**Template not found:**
-- Verify template name matches file in `templates/designs/`
-- Use `--list-templates` to see available templates
+### Scenario 3: Troubleshoot Issues
 
-## Phase 2 (Planned)
+**Goal:** Fix problems with authentication or processing
 
-Future enhancements:
-- Google Sheets monitoring for automated processing
-- Workflow orchestration and status tracking
-- Google Drive upload and organization
-- Email notifications
-- Scheduled processing
+**Check these guides:**
+1. [Troubleshooting](user-guide/troubleshooting.md) - Common issues
+2. [Authentication Guide](getting-started/authentication.md) - OAuth problems
+3. [Web Interface](user-guide/web-interface.md) - Usage issues
 
-## Contributing
+---
 
-This is an internal tool. For issues or enhancements, contact the development team.
+### Scenario 4: Deploy to Server
 
-## License
+**Goal:** Run AI Presentolog in production
 
-Internal use only - AI Presentolog Team
+**Follow these guides:**
+1. [Production Deployment](deployment/production.md) - Server setup
+2. [Authentication Guide](getting-started/authentication.md) - Secure OAuth
+3. [Troubleshooting](user-guide/troubleshooting.md) - Production issues
+
+---
+
+## 📋 Document Status
+
+| Section | Status | Last Updated |
+|---------|--------|--------------|
+| Getting Started | ✅ Complete | Dec 17, 2024 |
+| User Guide | ✅ Complete | Dec 17, 2024 |
+| Developer Guide | 🚧 In Progress | - |
+| Deployment | 🚧 In Progress | - |
+| Implementation History | ✅ Archived | Dec 17, 2024 |
+
+**Legend:**
+- ✅ Complete - Fully documented
+- 🚧 In Progress - Under development
+- 📝 Planned - Not yet started
+
+---
+
+## 🤝 Contributing to Documentation
+
+Found an issue or want to improve the docs?
+
+1. Documentation files are in Markdown format
+2. Located in `docs/` directory
+3. Follow existing structure and style
+4. Submit updates via pull request
+
+**Documentation standards:**
+- Clear, concise language
+- Step-by-step instructions
+- Screenshots where helpful
+- Code examples that work
+- Links to related docs
+
+---
+
+## 📞 Getting Help
+
+### Documentation Issues
+
+If documentation is unclear or incomplete:
+1. Check all related guides
+2. Review [Troubleshooting](user-guide/troubleshooting.md)
+3. Search implementation history for context
+
+### Technical Support
+
+For technical problems:
+1. Follow [Troubleshooting Guide](user-guide/troubleshooting.md)
+2. Check application logs
+3. Review Google API documentation
+
+### External Resources
+
+- **[Google OAuth 2.0](https://developers.google.com/identity/protocols/oauth2)**
+- **[Google Slides API](https://developers.google.com/slides/api)**
+- **[Google Drive API](https://developers.google.com/drive/api)**
+- **[Flask Documentation](https://flask.palletsprojects.com/)**
+
+---
+
+## 📝 Version History
+
+### Version 2.0.0 (December 17, 2024)
+
+**Documentation overhaul:**
+- Complete repository reorganization
+- Comprehensive user guides
+- Structured documentation
+- Quick start guide
+- Troubleshooting guide
+
+**Features:**
+- Web-based interface
+- Google OAuth integration
+- Interactive slide editor
+- Multi-user support
+- Template system
+
+---
+
+## 🗺️ Documentation Roadmap
+
+### Upcoming Documentation
+
+**Q1 2025:**
+- [ ] Architecture guide
+- [ ] API reference
+- [ ] Template development guide
+- [ ] Contributing guidelines
+
+**Q2 2025:**
+- [ ] Video tutorials
+- [ ] FAQ section
+- [ ] Migration guides
+- [ ] Performance tuning guide
+
+---
+
+**Welcome to AI Presentolog! Start with the [Quick Start Guide](getting-started/quick-start.md) to begin creating beautiful presentations.**
+
+---
+
+**Last Updated:** December 17, 2024  
+**Version:** 2.0.0  
+**Maintained by:** AI Presentolog Team

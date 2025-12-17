@@ -186,27 +186,60 @@ class TextParser:
         return False
     
     def create_slide_from_content(self, content: str, slide_id: str) -> Dict:
-        """Create slide dictionary from text content."""
+        """Create slide dictionary from text content.
+        
+        Extracts title from first line(s) if they look like a title.
+        """
         lines = [l.strip() for l in content.split('\n') if l.strip()]
         
-        # Filter out metadata lines like "(макроуровень)", "(микроуровень)" etc.
-        lines = [l for l in lines if not re.match(r'^\([^)]+уровень\)$', l, re.IGNORECASE)]
+        if not lines:
+            return {
+                'id': slide_id,
+                'title': '',
+                'mainText': '',
+                'secondaryText': ''
+            }
         
+        # Extract title from first line(s)
         title = ''
-        main_text = ''
+        content_start_idx = 0
         
-        if lines:
-            first_line = lines[0]
-            word_count = self.count_words(first_line)
+        # Check if first line looks like a title (short, no punctuation at end except question mark)
+        first_line = lines[0]
+        
+        # Title heuristics:
+        # - Less than 100 chars
+        # - Doesn't end with common sentence endings (., :, ;)
+        # - Doesn't start with bullet/number (unless it's a lesson/topic number)
+        is_title_like = (
+            len(first_line) <= 100 and
+            not first_line.endswith(('.', ':', ';', ',')) and
+            not first_line.startswith(('• ', '- ', '* ')) and
+            not re.match(r'^\d+[\.\)]\s', first_line)  # Not a list item like "1. something"
+        )
+        
+        if is_title_like:
+            title = first_line
+            content_start_idx = 1
             
-            # Title: ≤6 words -> TITLE, ≥7 words -> all to MAIN TEXT
-            if word_count <= 6:
-                title = first_line
-                remaining_lines = lines[1:]
-                main_text = self.format_content(remaining_lines) if remaining_lines else ''
-            else:
-                # All content goes to main text (no title)
-                main_text = self.format_content(lines)
+            # Check if second line is also part of title (subtitle-like)
+            if len(lines) > 1:
+                second_line = lines[1]
+                is_subtitle_like = (
+                    len(second_line) <= 80 and
+                    not second_line.endswith(('.', ':', ';', ',')) and
+                    not second_line.startswith(('• ', '- ', '* ')) and
+                    not re.match(r'^\d+[\.\)]\s', second_line)
+                )
+                
+                # If second line is short and title-like, combine them
+                if is_subtitle_like and len(second_line) < len(first_line):
+                    title = first_line + '\n' + second_line
+                    content_start_idx = 2
+        
+        # Remaining lines are main text
+        remaining_lines = lines[content_start_idx:]
+        main_text = self.format_content(remaining_lines) if remaining_lines else ''
         
         return {
             'id': slide_id,

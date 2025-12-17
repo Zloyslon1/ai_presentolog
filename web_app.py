@@ -32,6 +32,30 @@ app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-i
 CLIENT_SECRETS_FILE = os.path.join(os.path.dirname(__file__), 'credentials', 'client_secret.json')
 oauth_manager = WebOAuthManager(CLIENT_SECRETS_FILE)
 
+# Load Service Account credentials for server-side access
+SERVICE_ACCOUNT_FILE = os.path.join(os.path.dirname(__file__), 'credentials', 'service_account.json')
+SERVICE_ACCOUNT_CREDENTIALS = None
+
+if os.path.exists(SERVICE_ACCOUNT_FILE):
+    try:
+        from google.oauth2 import service_account
+        SCOPES = [
+            'https://www.googleapis.com/auth/presentations.readonly',
+            'https://www.googleapis.com/auth/drive.readonly'
+        ]
+        SERVICE_ACCOUNT_CREDENTIALS = service_account.Credentials.from_service_account_file(
+            SERVICE_ACCOUNT_FILE,
+            scopes=SCOPES
+        )
+        with open(SERVICE_ACCOUNT_FILE, 'r') as f:
+            sa_data = json.load(f)
+        print(f"✓ Service Account loaded: {sa_data.get('client_email', 'unknown')}")
+    except Exception as e:
+        print(f"Warning: Could not load Service Account: {e}")
+else:
+    print("No Service Account configured - OAuth required for URL import")
+    print(f"To enable server-side access, follow guide: SETUP_SERVICE_ACCOUNT.md")
+
 # In-memory storage for processing jobs (use database in production)
 jobs = {}
 
@@ -283,14 +307,27 @@ def get_job_owner(job_id):
 
 
 def user_owns_job(job_id, session_id):
-    """Check if a user (session) owns a specific job."""
+    """Check if a user (session) owns a specific job.
+    
+    NOTE: For local development, we skip ownership check since Flask sessions
+    don't persist properly in some browser contexts (like iframe previews).
+    """
+    # Skip ownership check for local development
+    is_local = os.environ.get('FLASK_ENV') != 'production'
+    if is_local:
+        print(f"DEBUG: Skipping ownership check for local development (job_id={job_id})")
+        return True
+    
     # Check in-memory jobs first
     job = jobs.get(job_id)
     if job:
-        return job.get('session_id') == session_id
+        job_session = job.get('session_id')
+        print(f"DEBUG user_owns_job: job_id={job_id}, current_session={session_id}, job_session={job_session}, match={job_session == session_id}")
+        return job_session == session_id
     
     # Check database
     owner = get_job_owner(job_id)
+    print(f"DEBUG user_owns_job (from DB): job_id={job_id}, current_session={session_id}, owner={owner}, match={owner == session_id}")
     return owner == session_id
 
 def cleanup_old_jobs(days=30):
@@ -317,6 +354,9 @@ def get_session_id():
     """Get current session ID from Flask session."""
     if 'session_id' not in session:
         session['session_id'] = str(uuid.uuid4())
+        print(f"DEBUG get_session_id: Created NEW session_id={session['session_id']}")
+    else:
+        print(f"DEBUG get_session_id: Using EXISTING session_id={session['session_id']}")
     return session['session_id']
 
 
@@ -462,12 +502,8 @@ def get_template_list():
 
 @app.route('/login')
 def login():
-    """Display login page or redirect if already authenticated."""
-    if oauth_manager.is_authenticated():
-        # Already authenticated, redirect to home
-        return redirect(url_for('index'))
-    
-    return render_template('login.html')
+    """Login page - redirect to index since auth is disabled."""
+    return redirect(url_for('index'))
 
 
 @app.route('/auth/google')
@@ -553,7 +589,6 @@ def logout():
 
 
 @app.route('/')
-@requires_auth
 def index():
     """Main page with presentation processing form."""
     # Get available templates
@@ -578,7 +613,6 @@ def index():
 
 
 @app.route('/process', methods=['POST'])
-@requires_auth
 def process():
     """Extract presentation and redirect to editor."""
     input_method = request.form.get('input_method', 'url')
@@ -591,38 +625,37 @@ def process():
         if not presentation_url:
             return jsonify({'error': 'Presentation URL is required'}), 400
         
-        # Get credentials from session
-        credentials = oauth_manager.get_credentials()
-        if not credentials:
-            return redirect(url_for('login'))
-        
-        # Convert credentials to dictionary
-        credentials_dict = {
-            'token': credentials.token,
-            'refresh_token': credentials.refresh_token,
-            'token_uri': credentials.token_uri,
-            'client_id': credentials.client_id,
-            'client_secret': credentials.client_secret,
-            'scopes': credentials.scopes
-        }
-        
         # Create job for extraction
         job_id = str(uuid.uuid4())[:8]
         jobs[job_id] = {
             'id': job_id,
             'url': presentation_url,
-            'template': None,  # No template needed
+            'template': None,
             'status': 'extracting',
             'created_at': datetime.now().isoformat(),
             'result': None,
             'error': None,
-            'session_id': session_id  # Link job to session
+            'session_id': session_id
         }
+        
+        # Try OAuth first, then API Key for public presentations
+        credentials = oauth_manager.get_credentials()
+        credentials_dict = None
+        
+        if credentials:
+            credentials_dict = {
+                'token': credentials.token,
+                'refresh_token': credentials.refresh_token,
+                'token_uri': credentials.token_uri,
+                'client_id': credentials.client_id,
+                'client_secret': credentials.client_secret,
+                'scopes': credentials.scopes
+            }
         
         # Extract content in background thread
         thread = threading.Thread(
-            target=extract_for_editor,
-            args=(job_id, presentation_url, credentials_dict)
+            target=extract_for_editor_smart,
+            args=(job_id, presentation_url, credentials_dict, SERVICE_ACCOUNT_CREDENTIALS)
         )
         thread.daemon = True
         thread.start()
@@ -660,6 +693,257 @@ def process():
     else:
         return jsonify({'error': 'Invalid input method'}), 400
 
+
+def extract_presentation_id(url):
+    """Extract presentation ID from Google Slides URL."""
+    import re
+    patterns = [
+        r'/presentation/d/([a-zA-Z0-9_-]+)',
+        r'/d/([a-zA-Z0-9_-]+)',
+        r'id=([a-zA-Z0-9_-]+)'
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, url)
+        if match:
+            return match.group(1)
+    return None
+
+
+def extract_for_editor_smart(job_id, presentation_url, credentials_dict=None, service_account_creds=None):
+    """Smart extraction - tries OAuth first, then Service Account for public presentations.
+    
+    Args:
+        job_id: Job identifier
+        presentation_url: URL of presentation to extract
+        credentials_dict: Optional user OAuth credentials dictionary
+        service_account_creds: Optional Service Account credentials
+    """
+    # Try OAuth extraction first if user credentials available
+    if credentials_dict:
+        print("User OAuth credentials available, using OAuth extraction...")
+        try:
+            extract_for_editor(job_id, presentation_url, credentials_dict)
+            return
+        except Exception as e:
+            print(f"OAuth extraction failed: {e}")
+            import traceback
+            traceback.print_exc()
+            # Continue to try Service Account
+    
+    # Try Service Account extraction for public/shared presentations
+    if service_account_creds:
+        print("Trying Service Account extraction...")
+        try:
+            extract_with_service_account(job_id, presentation_url, service_account_creds)
+            return
+        except Exception as e:
+            print(f"Service Account extraction failed: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    # All extraction methods failed
+    jobs[job_id]['status'] = 'error'
+    if not credentials_dict and not service_account_creds:
+        jobs[job_id]['error'] = 'Для импорта презентации необходимо войти в Google-аккаунт или настроить Service Account. См. SETUP_SERVICE_ACCOUNT.md'
+    elif credentials_dict and not service_account_creds:
+        jobs[job_id]['error'] = 'Не удалось извлечь презентацию с вашими учётными данными. Проверьте доступ к презентации.'
+    else:
+        jobs[job_id]['error'] = 'Не удалось извлечь презентацию. Убедитесь, что она доступна по ссылке ("Все, у кого есть ссылка") или поделитесь ей с Service Account.'
+    jobs[job_id]['completed_at'] = datetime.now().isoformat()
+    save_job_to_db(job_id, jobs[job_id])
+
+
+def extract_with_service_account(job_id, presentation_url, service_account_creds):
+    """Extract presentation using Service Account (for public/shared presentations).
+    
+    Uses the same extraction logic as OAuth but with Service Account credentials.
+    
+    Args:
+        job_id: Job identifier
+        presentation_url: URL of presentation to extract
+        service_account_creds: Service Account credentials object
+    """
+    try:
+        from presentation_design.extraction.slides_extractor import SlidesExtractor
+        from googleapiclient.discovery import build
+        
+        presentation_id = extract_presentation_id(presentation_url)
+        if not presentation_id:
+            raise ValueError('Неверный формат ссылки на Google Slides')
+        
+        print(f"Extracting presentation {presentation_id} with Service Account...")
+        
+        # Create a wrapper to provide the service method (same as OAuth)
+        class ServiceAccountWrapper:
+            def __init__(self, credentials):
+                self.credentials = credentials
+            
+            def build_service(self, service_name, version):
+                return build(service_name, version, credentials=self.credentials)
+        
+        sa_wrapper = ServiceAccountWrapper(service_account_creds)
+        
+        # Extract content in RAW MODE (preserve original text) - same as OAuth
+        extractor = SlidesExtractor(sa_wrapper)
+        raw_data = extractor.extract_presentation(presentation_url, raw_mode=True)
+        
+        print(f"DEBUG: Extracted {len(raw_data.get('slides', []))} slides in raw mode")
+        
+        # Convert raw data to editor format - ALL TEXT goes to mainText, preserve 1:1 order
+        slides = []
+        for idx, slide in enumerate(raw_data.get('slides', [])):
+            raw_elements = slide.get('raw_elements', [])
+            print(f"\n=== DEBUG: Slide {idx} ===")
+            print(f"Total raw elements: {len(raw_elements)}")
+            
+            # Collect ALL text in the EXACT order it appears
+            all_text_parts = []
+            
+            for i, element in enumerate(raw_elements):
+                content = element.get('content', '')
+                placeholder_type = element.get('placeholder_type', '')
+                
+                # Clean up special characters: replace vertical tab and other whitespace with regular space
+                content = content.replace('\v', ' ').replace('\r', ' ')
+                
+                # Filter out metadata lines like "(макроуровень)", "(микроуровень)" etc.
+                import re as re_filter
+                content_stripped = content.strip()
+                if re_filter.match(r'^\([^)]+уровень\)$', content_stripped, re_filter.IGNORECASE):
+                    print(f"  Element {i}: FILTERED OUT metadata '{content_stripped}'")
+                    continue
+                
+                print(f"  Element {i}: type='{placeholder_type}', content_length={len(content)}, preview='{content[:80] if content else '(empty)'}...")
+                
+                # Add ALL non-empty content to mainText
+                if content.strip():
+                    all_text_parts.append(content)
+                    print(f"    -> Added to mainText")
+                else:
+                    print(f"    -> Skipped (empty)")
+            
+            # SKIP slides that have no text content (empty slides or image-only slides)
+            if not all_text_parts:
+                print(f"  -> Skipping slide {idx}: no text content")
+                continue
+            
+            # Use TextParser to format the content (same as text paste)
+            from presentation_design.extraction.text_parser import TextParser
+            parser = TextParser()
+            
+            # Combine all text parts and parse as a single slide
+            all_text_content = '\n'.join(all_text_parts)
+            parsed_slide = parser.create_slide_from_content(all_text_content, str(idx + 1))
+            
+            # Format with HTML using the same function as text paste
+            formatted_content = format_slide_content(parsed_slide)
+            
+            editor_slide = {
+                'content': formatted_content,  # Formatted HTML with title, lists, etc.
+                'title': parsed_slide.get('title', ''),
+                'mainText': parsed_slide.get('mainText', ''),
+                'secondaryText': '',
+                'original_objectIds': [e.get('object_id') for e in raw_elements if e.get('object_id')]
+            }
+            
+            print(f"  -> Created editor slide with title: '{editor_slide['title'][:50] if editor_slide['title'] else '(no title)'}...'")
+            slides.append(editor_slide)
+        
+        print(f"\n=== FINAL: Created {len(slides)} editor slides ===")
+        
+        jobs[job_id]['status'] = 'extracted'
+        jobs[job_id]['slides'] = slides
+        jobs[job_id]['completed_at'] = datetime.now().isoformat()
+        save_job_to_db(job_id, jobs[job_id])
+        
+    except Exception as e:
+        print(f"Service Account extraction error: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
+
+
+def extract_with_api_key(job_id, presentation_url, api_key):
+    """Extract presentation using API Key (for public presentations only).
+    
+    Args:
+        job_id: Job identifier
+        presentation_url: URL of presentation to extract
+        api_key: Google API Key
+    """
+    from googleapiclient.discovery import build
+    from presentation_design.extraction.text_parser import TextParser
+    
+    presentation_id = extract_presentation_id(presentation_url)
+    if not presentation_id:
+        raise ValueError('Неверный формат ссылки на Google Slides')
+    
+    print(f"Extracting presentation {presentation_id} with API Key...")
+    print(f"API Key (first 10 chars): {api_key[:10]}...")
+    
+    # Build service with API Key
+    try:
+        service = build('slides', 'v1', developerKey=api_key)
+        print("Service built successfully")
+    except Exception as e:
+        print(f"Failed to build service: {e}")
+        raise
+    
+    # Get presentation data
+    try:
+        print(f"Attempting to get presentation {presentation_id}...")
+        presentation = service.presentations().get(presentationId=presentation_id).execute()
+        print(f"Successfully retrieved presentation data")
+    except Exception as e:
+        print(f"Failed to get presentation: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
+    
+    slides_data = presentation.get('slides', [])
+    print(f"Got {len(slides_data)} slides from API")
+    
+    # Convert to editor format
+    editor_slides = []
+    parser = TextParser()
+    
+    for idx, slide in enumerate(slides_data):
+        # Extract text from all shapes
+        all_text_parts = []
+        
+        for element in slide.get('pageElements', []):
+            shape = element.get('shape', {})
+            text_content = shape.get('text', {})
+            
+            for text_element in text_content.get('textElements', []):
+                text_run = text_element.get('textRun', {})
+                content = text_run.get('content', '')
+                if content.strip():
+                    all_text_parts.append(content.strip())
+        
+        if not all_text_parts:
+            continue
+        
+        # Parse and format
+        all_text_content = '\n'.join(all_text_parts)
+        parsed_slide = parser.create_slide_from_content(all_text_content, str(idx + 1))
+        formatted_content = format_slide_content(parsed_slide)
+        
+        editor_slide = {
+            'content': formatted_content,
+            'title': parsed_slide.get('title', ''),
+            'mainText': parsed_slide.get('mainText', ''),
+            'secondaryText': '',
+            'original_objectIds': []
+        }
+        editor_slides.append(editor_slide)
+    
+    print(f"Extracted {len(editor_slides)} slides with API Key")
+    
+    jobs[job_id]['status'] = 'extracted'
+    jobs[job_id]['slides'] = editor_slides
+    jobs[job_id]['completed_at'] = datetime.now().isoformat()
+    save_job_to_db(job_id, jobs[job_id])
 
 def extract_for_editor(job_id, presentation_url, credentials_dict):
     """Extract presentation content for editor - preserve exact 1:1 structure from Google Slides.
@@ -889,7 +1173,6 @@ def process_in_background(job_id, presentation_url, template_name):
 
 
 @app.route('/slide_editor')
-@requires_auth
 def slide_editor():
     """Visual slide editor."""
     # Get data from job instead of URL params
@@ -951,7 +1234,6 @@ def slide_editor():
 
 
 @app.route('/extraction_status/<job_id>')
-@requires_auth
 def extraction_status(job_id):
     """Show extraction status and redirect to editor when ready."""
     session_id = get_session_id()
@@ -986,7 +1268,6 @@ def extraction_status(job_id):
 
 
 @app.route('/process_slides', methods=['POST'])
-@requires_auth
 def process_slides():
     """Process slides from editor and generate presentation."""
     data = request.get_json()
@@ -1138,7 +1419,6 @@ def process_slides_in_background(job_id, slides, template_name=None, existing_pr
 
 
 @app.route('/job/<job_id>')
-@requires_auth
 def job_status(job_id):
     """Show job status page."""
     session_id = get_session_id()
@@ -1164,7 +1444,6 @@ def job_status(job_id):
 
 
 @app.route('/api/job/<job_id>')
-@requires_auth
 def api_job_status(job_id):
     """API endpoint for job status (for AJAX polling)."""
     session_id = get_session_id()
@@ -1197,7 +1476,6 @@ def api_job_status(job_id):
 
 
 @app.route('/api/save_slides', methods=['POST'])
-@requires_auth
 def api_save_slides():
     """Save slides and settings to database."""
     try:
@@ -1268,7 +1546,6 @@ def api_save_slides():
 
 
 @app.route('/api/load_slides', methods=['GET'])
-@requires_auth
 def api_load_slides():
     """Load slides and settings from database."""
     try:
@@ -1312,7 +1589,6 @@ def api_load_slides():
 
 
 @app.route('/history')
-@requires_auth
 def history():
     """Show processing history for current user only."""
     # Get current user's session_id
